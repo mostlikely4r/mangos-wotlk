@@ -78,7 +78,9 @@
 #include "PlayerbotAIConfig.h"
 #include "RandomPlayerbotMgr.h"
 #endif
+#include "Metric/Metric.h"
 
+#include <algorithm>
 #include <mutex>
 
 INSTANTIATE_SINGLETON_1(World);
@@ -101,7 +103,7 @@ TimePoint World::m_currentTime = TimePoint();
 uint32 World::m_currentDiff = 0;
 
 /// World constructor
-World::World(): mail_timer(0), mail_timer_expires(0), m_NextMonthlyQuestReset(0)
+World::World() : mail_timer(0), mail_timer_expires(0), m_NextDailyQuestReset(0), m_NextWeeklyQuestReset(0), m_NextMonthlyQuestReset(0), m_opcodeCounters(NUM_MSG_TYPES)
 {
     m_playerLimit = 0;
     m_allowMovement = true;
@@ -111,8 +113,7 @@ World::World(): mail_timer(0), mail_timer_expires(0), m_NextMonthlyQuestReset(0)
     m_startTime = m_gameTime;
     m_maxActiveSessionCount = 0;
     m_maxQueuedSessionCount = 0;
-    m_NextDailyQuestReset = 0;
-    m_NextWeeklyQuestReset = 0;
+
 
     m_defaultDbcLocale = LOCALE_enUS;
     m_availableDbcLocaleMask = 0;
@@ -152,7 +153,7 @@ World::~World()
 /// Cleanups before world stop
 void World::CleanupsBeforeStop()
 {
-    KickAll();                                       // save and kick all players
+    KickAll(true);                                   // save and kick all players
     UpdateSessions(1);                               // real players unload required UpdateSessions call
     sBattleGroundMgr.DeleteAllBattleGrounds();       // unload battleground templates before different singletons destroyed
     sMapMgr.UnloadAll();                             // unload all grids (including locked in memory)
@@ -241,6 +242,9 @@ World::AddSession_(WorldSession* s)
     // login as a session and queue the socket that we are using
     if (decrease_session)
         --Sessions;
+
+    if (m_uniqueSessionCount.find(s->GetAccountId()) == m_uniqueSessionCount.end())
+        m_uniqueSessionCount.insert(s->GetAccountId());
 
     if (pLimit > 0 && Sessions >= pLimit && s->GetSecurity() == SEC_PLAYER)
     {
@@ -1465,6 +1469,9 @@ void World::SetInitialWorldSettings()
     sWorldState.Load();
     sLog.outString();
 
+    // update metrics output every second
+    m_timers[WUPDATE_METRICS].SetInterval(1 * IN_MILLISECONDS);
+
 #ifdef BUILD_PLAYERBOT
     PlayerbotMgr::SetInitialWorldSettings();
 #endif
@@ -1549,6 +1556,8 @@ void World::Update(uint32 diff)
     ///- Update the game time and check for shutdown time
     _UpdateGameTime();
 
+    GetMessager().Execute(this);
+
     ///-Update mass mailer tasks if any
     sMassMailMgr.Update();
 
@@ -1608,6 +1617,7 @@ void World::Update(uint32 diff)
 #endif
 
     /// <li> Handle session updates
+    auto preSessionTime = std::chrono::time_point_cast<std::chrono::milliseconds>(Clock::now());
     UpdateSessions(diff);
 
     /// <li> Update uptime table
@@ -1619,14 +1629,15 @@ void World::Update(uint32 diff)
         m_timers[WUPDATE_UPTIME].Reset();
         LoginDatabase.PExecute("UPDATE uptime SET uptime = %u, maxplayers = %u WHERE realmid = %u AND starttime = " UI64FMTD, tmpDiff, maxClientsNum, realmID, uint64(m_startTime));
     }
-
+    auto preMapTime = std::chrono::time_point_cast<std::chrono::milliseconds>(Clock::now());
     /// <li> Handle all other objects
     ///- Update objects (maps, transport, creatures,...)
     sMapMgr.Update(diff);
+    auto postMapTime = std::chrono::time_point_cast<std::chrono::milliseconds>(Clock::now());
     sBattleGroundMgr.Update(diff);
     sOutdoorPvPMgr.Update(diff);
     sWorldState.Update(diff);
-
+    auto postSingletonTime = std::chrono::time_point_cast<std::chrono::milliseconds>(Clock::now());
     ///- Update groups with offline leaders
     if (m_timers[WUPDATE_GROUPS].Passed())
     {
@@ -1665,6 +1676,13 @@ void World::Update(uint32 diff)
         m_timers[WUPDATE_EVENTS].Reset();
     }
 
+    if (m_timers[WUPDATE_METRICS].Passed())
+    {
+        m_timers[WUPDATE_METRICS].Reset();
+
+        GeneratePacketMetrics();
+    }
+
     /// </ul>
     ///- Move all creatures with "delayed move" and remove and delete all objects with "delayed remove"
     sMapMgr.RemoveAllObjectsInRemoveList();
@@ -1677,6 +1695,22 @@ void World::Update(uint32 diff)
 
     // cleanup unused GridMap objects as well as VMaps
     sTerrainMgr.Update(diff);
+
+    auto updateEndTime = std::chrono::time_point_cast<std::chrono::milliseconds>(Clock::now());
+    long long total = (updateEndTime - m_currentTime).count();
+    long long presession = (preSessionTime - m_currentTime).count();
+    long long premap = (preMapTime - preSessionTime).count();
+    long long map = (postMapTime - preMapTime).count();
+    long long singletons = (postSingletonTime - postMapTime).count();
+    long long cleanup = (updateEndTime - postSingletonTime).count();
+
+    metric::measurement meas("world.update");
+    meas.add_field("total", std::to_string(total));
+    meas.add_field("presession", std::to_string(presession));
+    meas.add_field("premap", std::to_string(premap));
+    meas.add_field("map", std::to_string(map));
+    meas.add_field("singletons", std::to_string(singletons));
+    meas.add_field("cleanup", std::to_string(cleanup));
 }
 
 namespace MaNGOS
@@ -1880,13 +1914,13 @@ void World::SendDefenseMessageBroadcastText(uint32 zoneId, uint32 textId)
 }
 
 /// Kick (and save) all players
-void World::KickAll()
+void World::KickAll(bool save)
 {
     m_QueuedSessions.clear();                               // prevent send queue update packet and login queued sessions
 
     // session not removed at kick and will removed in next update tick
     for (SessionMap::const_iterator itr = m_sessions.begin(); itr != m_sessions.end(); ++itr)
-        itr->second->KickPlayer();
+        itr->second->KickPlayer(save, true);
 }
 
 /// Kick (and save) all players with security level less `sec`
@@ -1937,7 +1971,7 @@ BanReturn World::BanAccount(BanMode mode, std::string nameOrIP, uint32 duration_
     {
         case BAN_IP:
             // No SQL injection as strings are escaped
-            resultAccounts = LoginDatabase.PQuery("SELECT id FROM account WHERE last_ip = '%s'", nameOrIP.c_str());
+            resultAccounts = LoginDatabase.PQuery("SELECT accountId FROM account_logons WHERE ip = '%s' ORDER BY loginTime DESC LIMIT 1", nameOrIP.c_str());
             LoginDatabase.PExecute("INSERT INTO ip_banned VALUES ('%s',UNIX_TIMESTAMP(),UNIX_TIMESTAMP()+%u,'%s','%s')", nameOrIP.c_str(), duration_secs, safe_author.c_str(), reason.c_str());
             break;
         case BAN_ACCOUNT:
@@ -2114,12 +2148,15 @@ void World::UpdateSessions(uint32 /*diff*/)
 {
     ///- Add new sessions
     {
-        std::lock_guard<std::mutex> guard(m_sessionAddQueueLock);
+        std::deque<WorldSession*> sessionQueueCopy;
+        {
+            std::lock_guard<std::mutex> guard(m_sessionAddQueueLock);
+            std::swap(m_sessionAddQueue, sessionQueueCopy);
+        }
 
-        for (auto const& session : m_sessionAddQueue)
+        for (auto const& session : sessionQueueCopy)
             AddSession_(session);
 
-        m_sessionAddQueue.clear();
     }
 
     ///- Then send an update signal to remaining ones
@@ -2491,6 +2528,22 @@ void World::UpdateMaxSessionCounters()
     m_maxQueuedSessionCount = std::max(m_maxQueuedSessionCount, uint32(m_QueuedSessions.size()));
 }
 
+void World::SetOnlinePlayer(Team team, uint8 race, uint8 plClass, bool apply)
+{
+    if (apply)
+    {
+        ++m_onlineTeams[team == ALLIANCE ? 1 : 0];
+        ++m_onlineRaces[race];
+        ++m_onlineClasses[plClass];
+    }
+    else
+    {
+        --m_onlineTeams[team == ALLIANCE ? 1 : 0];
+        --m_onlineRaces[race];
+        --m_onlineClasses[plClass];
+    }
+}
+
 void World::LoadDBVersion()
 {
     QueryResult* result = WorldDatabase.Query("SELECT version, creature_ai_version, cache_id FROM db_version LIMIT 1");
@@ -2678,9 +2731,53 @@ void World::InvalidatePlayerDataToAllClient(ObjectGuid guid) const
     SendGlobalMessage(data);
 }
 
-void World::UpdateSessionExpansion(uint8 expansion)
+void World::IncrementOpcodeCounter(uint32 opcodeId)
 {
-    for (auto& data : m_sessions)
-        if (data.second->GetSecurity() < SEC_GAMEMASTER)
-            data.second->SetExpansion(expansion);
+    ++m_opcodeCounters[opcodeId];
+}
+
+void World::GeneratePacketMetrics()
+{
+    for (uint32 i = 0; i < NUM_MSG_TYPES; ++i)
+    {
+        if (m_opcodeCounters[i] == 0)
+            continue;
+
+        metric::measurement meas("world.metrics.packets.received", { {"opcode", opcodeTable[i].name} });
+        meas.add_field("count", std::to_string(static_cast<uint32>(m_opcodeCounters[i])));
+
+        // Reset counter
+        m_opcodeCounters[i] = 0;
+    }
+
+    metric::measurement meas_players("world.metrics.players");
+    meas_players.add_field("online", std::to_string(GetActiveSessionCount()));
+    meas_players.add_field("unique", std::to_string(GetUniqueSessionCount()));
+    meas_players.add_field("queued", std::to_string(GetQueuedSessionCount()));
+    // team
+    meas_players.add_field("alliance", std::to_string(GetOnlineTeamPlayers(true)));
+    meas_players.add_field("horde", std::to_string(GetOnlineTeamPlayers(false)));
+    // race
+    meas_players.add_field("human", std::to_string(GetOnlineRacePlayers(RACE_HUMAN)));
+    meas_players.add_field("dwarf", std::to_string(GetOnlineRacePlayers(RACE_DWARF)));
+    meas_players.add_field("gnome", std::to_string(GetOnlineRacePlayers(RACE_GNOME)));
+    meas_players.add_field("nelf", std::to_string(GetOnlineRacePlayers(RACE_NIGHTELF)));
+    meas_players.add_field("draenei", std::to_string(GetOnlineRacePlayers(RACE_DRAENEI)));
+
+    meas_players.add_field("orc", std::to_string(GetOnlineRacePlayers(RACE_ORC)));
+    meas_players.add_field("undead", std::to_string(GetOnlineRacePlayers(RACE_UNDEAD)));
+    meas_players.add_field("tauren", std::to_string(GetOnlineRacePlayers(RACE_TAUREN)));
+    meas_players.add_field("troll", std::to_string(GetOnlineRacePlayers(RACE_TROLL)));
+    meas_players.add_field("belf", std::to_string(GetOnlineRacePlayers(RACE_BLOODELF)));
+    // class
+    meas_players.add_field("warrior", std::to_string(GetOnlineClassPlayers(CLASS_WARRIOR)));
+    meas_players.add_field("paladin", std::to_string(GetOnlineClassPlayers(CLASS_PALADIN)));
+    meas_players.add_field("hunter", std::to_string(GetOnlineClassPlayers(CLASS_HUNTER)));
+    meas_players.add_field("rogue", std::to_string(GetOnlineClassPlayers(CLASS_ROGUE)));
+    meas_players.add_field("priest", std::to_string(GetOnlineClassPlayers(CLASS_PRIEST)));
+    meas_players.add_field("shaman", std::to_string(GetOnlineClassPlayers(CLASS_SHAMAN)));
+    meas_players.add_field("mage", std::to_string(GetOnlineClassPlayers(CLASS_MAGE)));
+    meas_players.add_field("warlock", std::to_string(GetOnlineClassPlayers(CLASS_WARLOCK)));
+    meas_players.add_field("druid", std::to_string(GetOnlineClassPlayers(CLASS_DRUID)));
+    meas_players.add_field("deathknight", std::to_string(GetOnlineClassPlayers(CLASS_DEATH_KNIGHT)));
 }

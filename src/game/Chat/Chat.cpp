@@ -170,7 +170,7 @@ ChatCommand* ChatHandler::getCommandTable()
     static ChatCommand characterDeletedCommandTable[] =
     {
         { "delete",         SEC_CONSOLE,        true,  &ChatHandler::HandleCharacterDeletedDeleteCommand, "", nullptr },
-        { "list",           SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleCharacterDeletedListCommand, "", nullptr },
+        { "list",           SEC_CONSOLE,        true,  &ChatHandler::HandleCharacterDeletedListCommand, "", nullptr },
         { "restore",        SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleCharacterDeletedRestoreCommand, "", nullptr },
         { "old",            SEC_CONSOLE,        true,  &ChatHandler::HandleCharacterDeletedOldCommand, "", nullptr },
         { nullptr,             0,                  false, nullptr,                                           "", nullptr }
@@ -249,16 +249,8 @@ ChatCommand* ChatHandler::getCommandTable()
         { nullptr,          0,                  false, nullptr,                                             "", nullptr }
     };
 
-    static ChatCommand bgCommandTable[] =
-    {
-        { "start",          SEC_ADMINISTRATOR,  false, &ChatHandler::HandleDebugBattlegroundStartCommand,   "", nullptr },
-        { "",               SEC_ADMINISTRATOR,  false, &ChatHandler::HandleDebugBattlegroundCommand,        "", nullptr },
-        { nullptr,          0,                  false, nullptr,                                             "", nullptr }
-    };
-
     static ChatCommand debugPerformanceCommandTable[] =
     {
-        { "maps",           SEC_ADMINISTRATOR,  false, &ChatHandler::HandleDebugMaps,                       "", nullptr },
         { "tempspawn",      SEC_ADMINISTRATOR,  false, &ChatHandler::HandleShowTemporarySpawnList,          "", nullptr },
         { "gridsloaded",    SEC_ADMINISTRATOR,  false, &ChatHandler::HandleGridsLoadedCount,                "", nullptr },
         { nullptr,          0,                  false, nullptr,                                             "", nullptr }
@@ -268,7 +260,7 @@ ChatCommand* ChatHandler::getCommandTable()
     {
         { "anim",           SEC_GAMEMASTER,     false, &ChatHandler::HandleDebugAnimCommand,                "", nullptr },
         { "arena",          SEC_ADMINISTRATOR,  false, &ChatHandler::HandleDebugArenaCommand,               "", nullptr },
-        { "bg",             SEC_ADMINISTRATOR,  false, nullptr,                                             "", bgCommandTable },
+        { "bg",             SEC_ADMINISTRATOR,  false, &ChatHandler::HandleDebugBattlegroundCommand,        "", nullptr },
         { "getitemstate",   SEC_ADMINISTRATOR,  false, &ChatHandler::HandleDebugGetItemStateCommand,        "", nullptr },
         { "lootrecipient",  SEC_GAMEMASTER,     false, &ChatHandler::HandleDebugGetLootRecipientCommand,    "", nullptr },
         { "getitemvalue",   SEC_ADMINISTRATOR,  false, &ChatHandler::HandleDebugGetItemValueCommand,        "", nullptr },
@@ -310,15 +302,15 @@ ChatCommand* ChatHandler::getCommandTable()
 
     static ChatCommand gmCommandTable[] =
     {
-        { "chat",           SEC_MODERATOR,      false, &ChatHandler::HandleGMChatCommand,              "", nullptr },
+        { "chat",           SEC_ADMINISTRATOR,  false, &ChatHandler::HandleGMChatCommand,              "", nullptr },
         { "fly",            SEC_ADMINISTRATOR,  false, &ChatHandler::HandleGMFlyCommand,               "", nullptr },
-        { "ingame",         SEC_PLAYER,         true,  &ChatHandler::HandleGMListIngameCommand,        "", nullptr },
+        { "ingame",         SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleGMListIngameCommand,        "", nullptr },
         { "list",           SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleGMListFullCommand,          "", nullptr },
         { "mountup",        SEC_MODERATOR,      false, &ChatHandler::HandleGMMountUpCommand,           "", nullptr },
-        { "visible",        SEC_MODERATOR,      false, &ChatHandler::HandleGMVisibleCommand,           "", nullptr },
-        { "setview",        SEC_MODERATOR,      false, &ChatHandler::HandleSetViewCommand,             "", nullptr },
-        { "",               SEC_MODERATOR,      false, &ChatHandler::HandleGMCommand,                  "", nullptr },
-        { nullptr,             0,                  false, nullptr,                                           "", nullptr }
+        { "visible",        SEC_ADMINISTRATOR,  false, &ChatHandler::HandleGMVisibleCommand,           "", nullptr },
+        { "setview",        SEC_ADMINISTRATOR,  false, &ChatHandler::HandleSetViewCommand,             "", nullptr },
+        { "",               SEC_ADMINISTRATOR,  false, &ChatHandler::HandleGMCommand,                  "", nullptr },
+        { nullptr,          0,                  false, nullptr,                                        "", nullptr }
     };
 
     static ChatCommand goCommandTable[] =
@@ -728,6 +720,13 @@ ChatCommand* ChatHandler::getCommandTable()
         { nullptr,          0,                  false, nullptr,                                        "", nullptr }
     };
 
+    static ChatCommand combatCommandTable[] =
+    {
+        { "stop",           SEC_GAMEMASTER,     false, &ChatHandler::HandleCombatStopCommand,          "", nullptr },
+        { "list",           SEC_PLAYER,         false, &ChatHandler::HandleCombatListCommand,          "", nullptr },
+        { nullptr,          0,                  false, nullptr,                                        "", nullptr }
+    };
+
     static ChatCommand arenaCommandTable[] =
     {
         { "flushpoints",        SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleArenaFlushPointsCommand,      "", nullptr },
@@ -810,7 +809,8 @@ ChatCommand* ChatHandler::getCommandTable()
         { "current",        SEC_GAMEMASTER,     false, &ChatHandler::HandleTitlesCurrentCommand,       "", nullptr },
         { "remove",         SEC_GAMEMASTER,     false, &ChatHandler::HandleTitlesRemoveCommand,        "", nullptr },
         { "setmask",        SEC_GAMEMASTER,     false, &ChatHandler::HandleTitlesSetMaskCommand,       "", nullptr },
-        { nullptr,             0,                  false, nullptr,                                           "", nullptr }
+        { "swap",           SEC_GAMEMASTER,     false, &ChatHandler::HandleTitlesSwapCommand,          "", nullptr },
+        { nullptr,          0,                  false, nullptr,                                        "", nullptr }
     };
 
     static ChatCommand triggerCommandTable[] =
@@ -845,6 +845,12 @@ ChatCommand* ChatHandler::getCommandTable()
         { nullptr,          0,                  false, nullptr,                                        "", nullptr }
     };
 
+    static ChatCommand testingCommandTable[] =
+    {
+        { "bags",           SEC_GAMEMASTER,     false, &ChatHandler::HandleBagsCommand,                "", nullptr },
+        { nullptr,          0,                  false, nullptr,                                        "", nullptr }
+    };
+
     static ChatCommand ticketCommandTable[] =
     {
         { "discard",        SEC_GAMEMASTER,     false, &ChatHandler::HandleTicketDiscardCommand,       "", nullptr },
@@ -866,6 +872,13 @@ ChatCommand* ChatHandler::getCommandTable()
         { "queue",          SEC_ADMINISTRATOR,  false, &ChatHandler::HandleTicketsQueueCommand,        "", nullptr },
         { "",               SEC_GAMEMASTER,     false, &ChatHandler::HandleTicketsCommand,             "", nullptr },
         { nullptr,          0,                  false, nullptr,                                        "", nullptr }
+    };
+
+    static ChatCommand battlegroundCommandTable[] =
+    {
+        { "start",         SEC_GAMEMASTER,     false,  &ChatHandler::HandleBattlegroundStartCommand,   "", nullptr },
+        { "stop",          SEC_GAMEMASTER,     false,  &ChatHandler::HandleBattlegroundStopCommand,    "", nullptr },
+        { nullptr,         0,                  false,  nullptr,                                        "", nullptr }
     };
 
     static ChatCommand commandTable[] =
@@ -911,6 +924,7 @@ ChatCommand* ChatHandler::getCommandTable()
         { "titles",         SEC_GAMEMASTER,     false, nullptr,                                           "", titlesCommandTable   },
         { "trigger",        SEC_GAMEMASTER,     false, nullptr,                                           "", triggerCommandTable  },
         { "wp",             SEC_GAMEMASTER,     false, nullptr,                                           "", wpCommandTable       },
+        { "bg",             SEC_GAMEMASTER,     false, nullptr,                                        "", battlegroundCommandTable },
 
         { "aura",           SEC_ADMINISTRATOR,  false, &ChatHandler::HandleAuraCommand,                "", nullptr },
         { "unaura",         SEC_ADMINISTRATOR,  false, &ChatHandler::HandleUnAuraCommand,              "", nullptr },
@@ -953,6 +967,7 @@ ChatCommand* ChatHandler::getCommandTable()
         { "bank",           SEC_ADMINISTRATOR,  false, &ChatHandler::HandleBankCommand,                "", nullptr },
         { "mailbox",        SEC_ADMINISTRATOR,  false, &ChatHandler::HandleMailBoxCommand,             "", nullptr },
         { "wchange",        SEC_ADMINISTRATOR,  false, &ChatHandler::HandleChangeWeatherCommand,       "", nullptr },
+        { "testing",        SEC_GAMEMASTER,     false, nullptr,                                        "", testingCommandTable },
         { "ticket",         SEC_GAMEMASTER,     false, nullptr,                                        "", ticketCommandTable   },
         { "tickets",        SEC_GAMEMASTER,     false, nullptr,                                        "", ticketsCommandTable  },
         { "maxskill",       SEC_ADMINISTRATOR,  false, &ChatHandler::HandleMaxSkillCommand,            "", nullptr },
@@ -966,7 +981,7 @@ ChatCommand* ChatHandler::getCommandTable()
         { "unmute",         SEC_MODERATOR,      true,  &ChatHandler::HandleUnmuteCommand,              "", nullptr },
         { "movement",       SEC_PLAYER,         true,  nullptr,                                        "", movementCommandTable },
         { "damage",         SEC_ADMINISTRATOR,  false, &ChatHandler::HandleDamageCommand,              "", nullptr },
-        { "combatstop",     SEC_GAMEMASTER,     false, &ChatHandler::HandleCombatStopCommand,          "", nullptr },
+        { "combat",         SEC_PLAYER,         false, nullptr,                                        "", combatCommandTable },
         { "arena",          SEC_ADMINISTRATOR,  false, nullptr,                                        "", arenaCommandTable },
         { "flusharenapoints", SEC_ADMINISTRATOR, false, &ChatHandler::HandleArenaFlushPointsCommand,   "", nullptr },
         { "repairitems",    SEC_GAMEMASTER,     true,  &ChatHandler::HandleRepairitemsCommand,         "", nullptr },
@@ -3456,11 +3471,6 @@ uint32 ChatHandler::ExtractAccountId(char** args, std::string* accountName /*= n
         *targetIfNullArg = nullptr;
 
     return account_id;
-}
-
-Player* ChatHandler::GetPlayer()
-{
-    return m_session->GetPlayer();
 }
 
 struct RaceMaskName

@@ -441,6 +441,12 @@ inline bool IsSpellRemovedOnEvade(SpellEntry const* spellInfo)
             IsSpellHaveAura(spellInfo, SPELL_AURA_MIRROR_IMAGE) || IsSpellHaveAura(spellInfo, SPELL_AURA_MIRROR_NAME))
         return false;
 
+    if (IsSpellHaveAura(spellInfo, SPELL_AURA_MOD_CHARM))
+        return false;
+
+    if (IsSpellHaveAura(spellInfo, SPELL_AURA_MOD_POSSESS))
+        return false;
+
     switch (spellInfo->Id)
     {
         case 588:           // Inner Fire (Rank 1)
@@ -475,13 +481,16 @@ inline bool IsSpellRemovedOnEvade(SpellEntry const* spellInfo)
         case 10095:         // Hate to Zero (Hate to Zero)
         case 11838:         // Hate to Zero (Hate to Zero)
         case 11919:         // Poison Proc
+        case 11964:         // Fevered Fatigue
         case 11966:         // Fire Shield
         case 11984:         // Immolate
         case 12099:         // Shield Spike
         case 12246:         // Infected Spine
         case 12529:         // Chilling Touch
         case 12539:         // Ghoul Rot
+        case 12544:         // Frost Armor
         case 12546:         // Spitelash (Spitelash)
+        case 12550:         // Lightning Shield
         case 12556:         // Frost Armor
         case 12627:         // Disease Cloud
         case 12787:         // Thrash
@@ -489,9 +498,11 @@ inline bool IsSpellRemovedOnEvade(SpellEntry const* spellInfo)
         case 13299:         // Poison Proc
         case 13616:         // Wracking Pains Proc
         case 13767:         // Hate to Zero (Hate to Zero)
+        case 13787:         // Demon Armor
         case 14178:         // Sticky Tar
         case 15088:         // Flurry
         case 15097:         // Enrage
+        case 15506:         // Immolate
         case 15876:         // Ice Blast
         case 16140:         // Exploding Cadaver (Exploding Cadaver)
         case 16563:         // Drowning Death
@@ -501,6 +512,7 @@ inline bool IsSpellRemovedOnEvade(SpellEntry const* spellInfo)
         case 17467:         // Unholy Aura
         case 18148:         // Static Field
         case 18268:         // Fire Shield
+        case 18847:         // Fevered Fatigue
         case 18943:         // Double Attack
         case 18968:         // Fire Shield
         case 19030:         // Bear Form (Shapeshift)
@@ -525,13 +537,17 @@ inline bool IsSpellRemovedOnEvade(SpellEntry const* spellInfo)
         case 26341:         // Saurfang's Rage
         case 27987:         // Unholy Aura
         case 28126:         // Spirit Particles (purple)
+        case 28902:         // Bloodlust
         case 29406:         // Shadowform
         case 29526:         // Hate to Zero (Hate to Zero)
+        case 30982:         // Crippling Poison
         case 31332:         // Dire Wolf Visual
         case 31690:         // Putrid Mushroom
         case 31792:         // Bear Form (Shapeshift)
         case 32007:         // Mo'arg Engineer Transform Visual
+        case 32064:         // Battle Shout
         case 32900:         // Bone Shards Proc
+        case 32912:         // Windfury
         case 32939:         // Phase Burst
         case 32942:         // Phasing Invisibility
         case 33460:         // Inhibit Magic
@@ -539,13 +555,17 @@ inline bool IsSpellRemovedOnEvade(SpellEntry const* spellInfo)
         case 33908:         // Burning Spikes
         case 34343:         // Thorns
         case 35194:         // Shadowform
+        case 35281:         // Raging Flames
         case 35319:         // Electric Skin
         case 35408:         // Fear Proc
         case 35596:         // Power of the Legion
         case 35841:         // Draenei Spirit Visual
         case 35850:         // Draenei Spirit Visual 2
+        case 35917:         // Firey Intellect
         case 36006:         // Fel Fire Aura
         case 36118:         // Phasing Invisibility
+        case 36635:         // Fiery Weapon Proc
+        case 36640:         // Arcane Shield
         case 36784:         // Entropic Aura
         case 36788:         // Diminish Soul
         case 37119:         // Spirit Particles (Spawn)
@@ -557,6 +577,7 @@ inline bool IsSpellRemovedOnEvade(SpellEntry const* spellInfo)
         case 37863:         // Disease Cloud
         case 38844:         // Unholy Aura
         case 38847:         // Diminish Soul
+        case 38857:         // Spell Ground
         case 39102:         // Glowy (Black)
         case 39311:         // Scrapped Fel Reaver transform aura that is never removed even on evade
         case 39918:         // Soulgrinder Ritual Visual ( in progress)
@@ -963,6 +984,15 @@ inline bool HasMissingTargetFromClient(SpellEntry const* spellInfo)
     return false;
 }
 
+inline bool IsSpellRequireTarget(SpellEntry const* spellInfo)
+{
+    for (uint32 i = 0; i < MAX_EFFECT_INDEX; ++i)
+        if (IsUnitTargetTarget(spellInfo->EffectImplicitTargetA[i]))
+            return true;
+
+    return false;
+}
+
 inline bool IsScriptTarget(uint32 target)
 {
     return (target < MAX_SPELL_TARGETS ? (SpellTargetInfoTable[target].filter == TARGET_SCRIPT) : false);
@@ -1331,14 +1361,6 @@ inline void GetChainJumpRange(SpellEntry const* spellInfo, SpellEffectIndex effI
 
     switch (spellInfo->Id)
     {
-        case 2643:  // Multi-shot
-        case 14288:
-        case 14289:
-        case 14290:
-        case 25294:
-        case 27021:
-            maxSearchRangeTarget = 8.f;
-            break;
         case 32445: // Holy Wrath - Maiden of Virtue
             maxSearchRangeTarget = 100.f;
             break;

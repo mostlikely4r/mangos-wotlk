@@ -180,6 +180,72 @@ bool ItemUse_item_petrov_cluster_bombs(Player* pPlayer, Item* pItem, const Spell
     return false;
 }
 
+enum
+{
+    SPELL_PARACHUTE = 37897,
+};
+
+struct X52RocketHelmetAura : public AuraScript
+{
+    void OnApply(Aura* aura, bool apply) const
+    {
+        if (!apply)
+        {
+            Unit* target = aura->GetTarget();
+            target->CastSpell(target, SPELL_PARACHUTE, TRIGGERED_OLD_TRIGGERED);
+        }
+    }
+};
+
+enum
+{
+    SPELL_LIMITLESS_POWER = 45044,
+};
+
+struct PowerCircleAura : public AuraScript
+{
+    void OnApply(Aura* aura, bool apply) const
+    {
+        Unit* target = aura->GetTarget();
+        if (apply)
+            target->CastSpell(target, SPELL_LIMITLESS_POWER, TRIGGERED_OLD_TRIGGERED);
+        else
+            target->RemoveAurasDueToSpell(SPELL_LIMITLESS_POWER);
+    }
+};
+
+enum
+{
+    SPELL_GDR_PERIODIC_DAMAGE = 13493,
+    SPELL_GDR_DAMAGE_HIT      = 13279,
+};
+
+struct GDRChannel : public SpellScript
+{
+    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const override
+    {
+        if (effIdx == EFFECT_INDEX_1)
+            spell->GetCaster()->CastSpell(nullptr, SPELL_GDR_PERIODIC_DAMAGE, TRIGGERED_OLD_TRIGGERED);
+    }
+};
+
+struct GDRPeriodicDamage : public AuraScript
+{
+    int32 OnAuraValueCalculate(Aura* /*aura*/, Unit* /*caster*/, int32 value) const override
+    {
+        return urand(100, 500);
+    }
+
+    void OnApply(Aura* aura, bool apply) const override
+    {
+        if (!apply && aura->GetRemoveMode() == AURA_REMOVE_BY_EXPIRE)
+        {
+            int32 dmg = (int32)aura->GetScriptValue();
+            aura->GetTarget()->CastCustomSpell(aura->GetTarget()->GetTarget(), SPELL_GDR_DAMAGE_HIT, &dmg, nullptr, nullptr, TRIGGERED_OLD_TRIGGERED);
+        }
+    }
+};
+
 void AddSC_item_scripts()
 {
     Script* pNewScript = new Script;
@@ -208,4 +274,9 @@ void AddSC_item_scripts()
     pNewScript->RegisterSelf();
 
     RegisterAuraScript<AshbringerItemAura>("spell_ashbringer_item");
+    RegisterAuraScript<X52RocketHelmetAura>("spell_to_infinity_and_above");
+    RegisterAuraScript<PowerCircleAura>("spell_power_circle");
+
+    RegisterSpellScript<GDRChannel>("spell_gdr_channel");
+    RegisterAuraScript<GDRPeriodicDamage>("spell_gdr_periodic");
 }

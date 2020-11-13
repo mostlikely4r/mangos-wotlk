@@ -241,7 +241,7 @@ struct CreatureData
     bool  is_dead;
     uint8 movementType;
     uint8 spawnMask;
-    uint16 gameEvent;
+    int16 gameEvent;
     uint16 GuidPoolId;
     uint16 EntryPoolId;
     uint16 OriginalZoneId;
@@ -391,8 +391,10 @@ enum SelectFlags
 
 enum RegenStatsFlags
 {
-    REGEN_FLAG_HEALTH               = 0x001,
-    REGEN_FLAG_POWER                = 0x002,
+    REGEN_FLAG_HEALTH_IN_COMBAT     = 0x001, // placeholder for future
+    REGEN_FLAG_HEALTH               = 0x002,
+    REGEN_FLAG_POWER_IN_COMBAT      = 0x004,
+    REGEN_FLAG_POWER                = 0x008,
 };
 
 // Vendors
@@ -694,6 +696,7 @@ class Creature : public Unit
         uint32 GetShieldBlockValue() const override { return (getLevel() / 2 + uint32(GetStat(STAT_STRENGTH) / 20)); }
 
         bool HasSpell(uint32 spellID) const override;
+        void UpdateSpell(int32 index, int32 newSpellId) { m_spells[index] = newSpellId; }
         void UpdateSpellSet(uint32 spellSet);
 
         bool UpdateEntry(uint32 Entry, const CreatureData* data = nullptr, GameEventCreatureData const* eventData = nullptr, bool preserveHPAndPower = true);
@@ -746,7 +749,7 @@ class Creature : public Unit
         void PrepareBodyLootState();
         CreatureLootStatus GetLootStatus() const { return m_lootStatus; }
         virtual void InspectingLoot() override;
-        void SetLootStatus(CreatureLootStatus status);
+        void SetLootStatus(CreatureLootStatus status, bool forced = false);
         bool IsTappedBy(Player* plr) const;
         ObjectGuid GetLootRecipientGuid() const { return m_lootRecipientGuid; }
         uint32 GetLootGroupRecipientId() const { return m_lootGroupRecipientId; }
@@ -813,7 +816,7 @@ class Creature : public Unit
 
         GridReference<Creature>& GetGridRef() { return m_gridRef; }
         bool IsRegeneratingHealth() const { return (GetCreatureInfo()->RegenerateStats & REGEN_FLAG_HEALTH) != 0 && !(GetCreatureInfo()->CreatureTypeFlags & CREATURE_TYPEFLAGS_SIEGE_WEAPON); }
-        bool IsRegeneratingPower() const { return (GetCreatureInfo()->RegenerateStats & REGEN_FLAG_POWER) != 0; }
+        bool IsRegeneratingPower() const;
         virtual uint8 GetPetAutoSpellSize() const { return CREATURE_MAX_SPELLS; }
         virtual uint32 GetPetAutoSpellOnPos(uint8 pos) const
         {
@@ -824,6 +827,7 @@ class Creature : public Unit
 
         void SetCombatStartPosition(Position const& pos) { m_combatStartPos = pos; }
         void GetCombatStartPosition(Position& pos) const { pos = m_combatStartPos; }
+        Position const& GetCombatStartPosition() const { return m_combatStartPos; }
 
         void SetRespawnCoord(CreatureCreatePos const& pos) { m_respawnPos = pos.m_pos; }
         void SetRespawnCoord(float x, float y, float z, float ori) { m_respawnPos.x = x; m_respawnPos.y = y; m_respawnPos.z = z; m_respawnPos.o = ori; }
@@ -874,6 +878,8 @@ class Creature : public Unit
         void SetNoLoot(bool state) { m_noLoot = state; }
         bool IsNoReputation() { return m_noReputation; }
         void SetNoReputation(bool state) { m_noReputation = state; }
+
+        virtual void AddCooldown(SpellEntry const& spellEntry, ItemPrototype const* itemProto = nullptr, bool permanent = false, uint32 forcedDuration = 0) override;
 
         // spell scripting persistency
         bool HasBeenHitBySpell(uint32 spellId);

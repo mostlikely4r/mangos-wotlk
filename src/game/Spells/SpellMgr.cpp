@@ -775,7 +775,6 @@ uint32 GetAffectedTargets(SpellEntry const* spellInfo, Unit* caster)
                 case 67757:                                 // Nerubian Burrower (Mode 3) (ToCrusader, Anub'arak)
                 case 71221:                                 // Gas spore (Mode 1) (ICC, Festergut)
                     return 4;
-                case 30843:                                 // Enfeeble (Karazhan, Prince Malchezaar)
                 case 40243:                                 // Crushing Shadows (BT, Teron Gorefiend)
                 case 42005:                                 // Bloodboil (BT, Gurtogg Bloodboil)
                 case 45641:                                 // Fire Bloom (SWP, Kil'jaeden)
@@ -1688,8 +1687,20 @@ struct DoSpellThreat
         if (ste.threat || ste.ap_bonus != 0.f)
         {
             const uint32* targetA = spell->EffectImplicitTargetA;
-            if ((targetA[EFFECT_INDEX_1] && targetA[EFFECT_INDEX_1] != targetA[EFFECT_INDEX_0]) ||
-                    (targetA[EFFECT_INDEX_2] && targetA[EFFECT_INDEX_2] != targetA[EFFECT_INDEX_0]))
+
+            uint32 target = 0;
+            bool failed = false;
+            for (int i = 0; i < MAX_EFFECT_INDEX; i++)
+            {
+                if (targetA[i] != 0)
+                {
+                    if (target == 0)
+                        target = targetA[i];
+                    else if (targetA[i] != target)
+                        failed = true;
+                }
+            }
+            if (failed)
                 sLog.outErrorDb("Spell %u listed in `spell_threat` has effects with different targets, threat may be assigned incorrectly", spell->Id);
         }
         ++count;
@@ -1847,6 +1858,11 @@ bool SpellMgr::IsNoStackSpellDueToSpell(SpellEntry const* spellInfo_1, SpellEntr
                     // See Icemist Invisibility and Agmar Invisibility
                     if ((spellInfo_1->Id == 47396 && spellInfo_2->Id == 47418) ||
                             (spellInfo_2->Id == 47418 && spellInfo_1->Id == 47396))
+                        return false;
+
+                    // See Wintergarde Invisibility Type B and See Wintergarde Invisibility Type C
+                    if ((spellInfo_1->Id == 48358 && spellInfo_2->Id == 48797) ||
+                        (spellInfo_2->Id == 48797 && spellInfo_1->Id == 48358))
                         return false;
 
                     // Cool Down (See PeriodicAuraTick())

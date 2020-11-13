@@ -97,7 +97,8 @@ enum ActionFeedback
     FEEDBACK_NONE            = 0,
     FEEDBACK_PET_DEAD        = 1,
     FEEDBACK_NOTHING_TO_ATT  = 2,
-    FEEDBACK_CANT_ATT_TARGET = 3
+    FEEDBACK_CANT_ATT_TARGET = 3,
+    FEEDBACK_NO_PATH         = 4,
 };
 
 enum PetTalk
@@ -180,9 +181,10 @@ class Pet : public Creature
 
         bool CanSwim() const
         {
-            Unit const* owner = GetOwner();
-            if (owner)
-                return owner->GetTypeId() == TYPEID_PLAYER ? true : ((Creature const*)owner)->CanSwim();
+            if (HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED))
+                return true;
+            if (Unit const* owner = GetOwner())
+                return static_cast<Creature const*>(owner)->CanSwim();
             return Creature::CanSwim();
         }
 
@@ -276,6 +278,7 @@ class Pet : public Creature
 
         virtual void RegenerateHealth() override;
 
+        void ResetCorpseRespawn();
     protected:
         uint32  m_happinessTimer;
         PetType m_petType;

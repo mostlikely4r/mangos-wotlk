@@ -47,6 +47,7 @@
 #include "PlayerDefines.h"
 
 #include <list>
+#include <array>
 
 enum SpellInterruptFlags
 {
@@ -1081,7 +1082,8 @@ struct ProcExecutionData
 
     // Scripting data
     uint32 triggeredSpellId;
-    int32 basepoints[MAX_EFFECT_INDEX] = { 0, 0, 0 };
+    std::array<int32, MAX_EFFECT_INDEX> basepoints = { 0, 0, 0 };
+    bool procOnce;
 
     ProcExecutionData(ProcSystemArguments& data, bool isVictim);
 };
@@ -1579,6 +1581,7 @@ class Unit : public WorldObject
         void SetPowerType(Powers new_powertype);
         uint32 GetPower(Powers power) const { return GetUInt32Value(UNIT_FIELD_POWER1 + power); }
         uint32 GetMaxPower(Powers power) const { return GetUInt32Value(UNIT_FIELD_MAXPOWER1 + power); }
+        float GetPowerPercent() const { return (GetMaxPower(GetPowerType()) == 0) ? 0.0f : (GetPower(GetPowerType()) * 100.0f) / GetMaxPower(GetPowerType()); }
         void SetPower(Powers power, uint32 val);
         void SetMaxPower(Powers power, uint32 val);
         int32 ModifyPower(Powers power, int32 dVal);
@@ -1869,7 +1872,7 @@ class Unit : public WorldObject
         void EngageInCombatWith(Unit* enemy);
         void EngageInCombatWithAggressor(Unit* aggressor);
         void ClearInCombat();
-        void HandleExitCombat();
+        void HandleExitCombat(bool pvpCombat = false);
 
         SpellAuraHolderBounds GetSpellAuraHolderBounds(uint32 spell_id)
         {
@@ -1984,6 +1987,7 @@ class Unit : public WorldObject
         bool IsLevitating() const { return m_movementInfo.HasMovementFlag(MOVEFLAG_LEVITATING); }
         bool IsWalking() const { return m_movementInfo.HasMovementFlag(MOVEFLAG_WALK_MODE); }
         bool IsRooted() const { return m_movementInfo.HasMovementFlag(MOVEFLAG_ROOT); }
+        bool IsFalling() const { return m_movementInfo.HasMovementFlag(MOVEFLAG_FALLING); }
 
         virtual void SetLevitate(bool /*enabled*/) {}
         virtual void SetSwim(bool /*enabled*/) {}
@@ -2403,8 +2407,8 @@ class Unit : public WorldObject
 
         bool IsTriggeredAtSpellProcEvent(ProcExecutionData& data, SpellAuraHolder* holder, SpellProcEventEntry const*& spellProcEvent);
         // only to be used in proc handlers - basepoints is expected to be a MAX_EFFECT_INDEX sized array
-        SpellAuraProcResult TriggerProccedSpell(Unit* target, int32* basepoints, uint32 triggeredSpellId, Item* castItem, Aura* triggeredByAura, uint32 cooldown);
-        SpellAuraProcResult TriggerProccedSpell(Unit* target, int32* basepoints, SpellEntry const* spellInfo, Item* castItem, Aura* triggeredByAura, uint32 cooldown);
+        SpellAuraProcResult TriggerProccedSpell(Unit* target, std::array<int32, MAX_EFFECT_INDEX>& basepoints, uint32 triggeredSpellId, Item* castItem, Aura* triggeredByAura, uint32 cooldown);
+        SpellAuraProcResult TriggerProccedSpell(Unit* target, std::array<int32, MAX_EFFECT_INDEX>& basepoints, SpellEntry const* spellInfo, Item* castItem, Aura* triggeredByAura, uint32 cooldown);
         // Aura proc handlers
         SpellAuraProcResult HandleDummyAuraProc(ProcExecutionData& data);
         SpellAuraProcResult HandleHasteAuraProc(ProcExecutionData& data);
@@ -2610,8 +2614,6 @@ class Unit : public WorldObject
         virtual UnitAI* AI() { return nullptr; }
         virtual CombatData* GetCombatData() { return m_combatData; }
 
-        virtual void AddCooldown(SpellEntry const& spellEntry, ItemPrototype const* itemProto = nullptr, bool permanent = false, uint32 forcedDuration = 0) override;
-
         virtual void SetBaseWalkSpeed(float speed) { m_baseSpeedWalk = speed; }
         virtual void SetBaseRunSpeed(float speed) { m_baseSpeedRun = speed; }
         float GetBaseRunSpeed() { return m_baseSpeedRun; }
@@ -2646,6 +2648,9 @@ class Unit : public WorldObject
 
         void RegisterScalingAura(Aura* aura, bool apply);
         void UpdateScalingAuras();
+
+        uint32 GetDamageDoneByOthers() { return m_damageByOthers; }
+        uint32 GetModifierXpBasedOnDamageReceived(uint32 xp);
 
     protected:
 
@@ -2822,6 +2827,8 @@ class Unit : public WorldObject
         ObjectGuid m_comboTargetGuid;
         int8 m_comboPoints;
 
+        uint32 m_damageByOthers;
+
     private:                                                // Error traps for some wrong args using
         // this will catch and prevent build for any cases when all optional args skipped and instead triggered used non boolean type
         // no bodies expected for this declarations
@@ -2921,7 +2928,7 @@ bool Unit::CheckAllControlledUnits(Func const& func, uint32 controlledMask) cons
 
 // Helper for targets nearest to the spell target
 // The spell target is always first unless there is a target at _completely_ the same position (unbelievable case)
-struct TargetDistanceOrderNear : public std::binary_function<Unit const, Unit const, bool>
+struct TargetDistanceOrderNear
 {
     Unit const* m_mainTarget;
     DistanceCalculation m_distcalc;
@@ -2936,7 +2943,7 @@ struct TargetDistanceOrderNear : public std::binary_function<Unit const, Unit co
 
 // Helper for targets furthest away to the spell target
 // The spell target is always first unless there is a target at _completely_ the same position (unbelievable case)
-struct TargetDistanceOrderFarAway : public std::binary_function<Unit const, Unit const, bool>
+struct TargetDistanceOrderFarAway
 {
     Unit const* m_mainTarget;
     DistanceCalculation m_distcalc;
@@ -2948,7 +2955,7 @@ struct TargetDistanceOrderFarAway : public std::binary_function<Unit const, Unit
     }
 };
 
-struct LowestHPNearestOrder : public std::binary_function<Unit const, Unit const, bool>
+struct LowestHPNearestOrder
 {
     Unit const* m_mainTarget;
     DistanceCalculation m_distcalc;

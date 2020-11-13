@@ -3829,6 +3829,8 @@ bool ChatHandler::HandleNpcInfoCommand(char* /*args*/)
     PSendSysMessage("Combat timer: %u", target->GetCombatManager().GetCombatTimer());
     PSendSysMessage("Is in evade mode: %s", target->GetCombatManager().IsInEvadeMode() ? "true" : "false");
 
+    PSendSysMessage("Combat Timer: %u Leashing disabled: %s", target->GetCombatManager().GetCombatTimer(), target->GetCombatManager().IsLeashingDisabled() ? "true" : "false");
+
     if (auto vector = sObjectMgr.GetAllRandomEntries(target->GetGUIDLow()))
     {
         std::string output;
@@ -4465,6 +4467,12 @@ bool ChatHandler::HandleListAurasCommand(char* args)
 
     uint32 auraNameId;
     ExtractOptUInt32(&args, auraNameId, 0);
+    if (auraNameId >= TOTAL_AURAS)
+    {
+        PSendSysMessage("Need to use aura name id below %u.", TOTAL_AURAS);
+        SetSentErrorMessage(true);
+        return false;
+    }
 
     char const* talentStr = GetMangosString(LANG_TALENT);
     char const* passiveStr = GetMangosString(LANG_PASSIVE);
@@ -5387,7 +5395,7 @@ bool ChatHandler::HandleBanInfoCharacterCommand(char* args)
 
 bool ChatHandler::HandleBanInfoHelper(uint32 accountid, char const* accountname)
 {
-    QueryResult* result = LoginDatabase.PQuery("SELECT FROM_UNIXTIME(banned_at),expires_at-banned_at,active,expires_at,reason,banned_by,unbanned_at,unbanned_by"
+    QueryResult* result = LoginDatabase.PQuery("SELECT FROM_UNIXTIME(banned_at),expires_at-banned_at,active,expires_at,reason,banned_by,unbanned_at,unbanned_by "
                                                "FROM account_banned WHERE account_id = '%u' ORDER BY banned_at ASC", accountid);
     if (!result)
     {
@@ -5406,7 +5414,7 @@ bool ChatHandler::HandleBanInfoHelper(uint32 accountid, char const* accountname)
             active = true;
         bool permanent = (fields[1].GetUInt64() == (uint64)0);
         std::string bantime = permanent ? GetMangosString(LANG_BANINFO_INFINITE) : secsToTimeString(fields[1].GetUInt64(), true);
-        std::string unbannedBy = fields[7].GetString();
+        std::string unbannedBy = fields[7].IsNULL() ? "" : fields[7].GetString();
         std::string manuallyUnbanned = "";
         if (unbannedBy.empty())
             manuallyUnbanned = GetMangosString(LANG_BANINFO_YES);

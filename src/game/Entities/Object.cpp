@@ -845,23 +845,22 @@ void Object::ClearUpdateMask(bool remove)
     }
 }
 
-bool Object::LoadValues(const char* data)
+void Object::_LoadIntoDataField(const char* data, uint32 startOffset, uint32 count)
 {
-    if (!m_uint32Values) _InitValues();
+    if (!data)
+        return;
 
     Tokens tokens = StrSplit(data, " ");
 
-    if (tokens.size() != m_valuesCount)
-        return false;
+    if (tokens.size() != count)
+        return;
 
-    Tokens::iterator iter;
-    int index;
-    for (iter = tokens.begin(), index = 0; index < m_valuesCount; ++iter, ++index)
+    Tokens::const_iterator iter;
+    uint32 index;
+    for (iter = tokens.begin(), index = 0; index < count; ++iter, ++index)
     {
-        m_uint32Values[index] = std::stoul(*iter);
+        m_uint32Values[startOffset + index] = atol((*iter).c_str());
     }
-
-    return true;
 }
 
 void Object::_SetUpdateBits(UpdateMask* updateMask, Player* /*target*/) const
@@ -1470,7 +1469,7 @@ float WorldObject::GetAngleAt(float x, float y, float ox, float oy)
 
 float WorldObject::GetAngle(float x, float y) const
 {
-    return GetAngleAt(GetPositionX(), GetPositionY(), x, y);
+    return m_position.GetAngle(x, y);
 }
 
 float WorldObject::GetAngleAt(float x, float y, const WorldObject* obj) const
@@ -2458,8 +2457,10 @@ bool WorldObject::IsSpellReady(SpellEntry const& spellEntry, ItemPrototype const
         }
     }
 
-    if (m_cooldownMap.FindBySpellId(spellEntry.Id) != m_cooldownMap.end())
-        return false;
+    auto itr = m_cooldownMap.FindBySpellId(spellEntry.Id);
+    if (itr != m_cooldownMap.end())
+        if (!itemProto || itemProto->ItemId == (*itr).second.get()->GetItemId())
+            return false;
 
     if (spellCategory && m_cooldownMap.FindByCategory(spellCategory) != m_cooldownMap.end())
         return false;
@@ -2709,6 +2710,7 @@ int32 WorldObject::CalculateSpellEffectValue(Unit const* target, SpellEntry cons
                 case SPELL_AURA_PERIODIC_LEECH:
                     //   SPELL_AURA_PERIODIC_DAMAGE_PERCENT: excluded, abs values only
                 case SPELL_AURA_POWER_BURN_MANA:
+                case SPELL_AURA_PERIODIC_TRIGGER_SPELL_WITH_VALUE:
                     damage = true;
             }
         }
@@ -2742,4 +2744,14 @@ int32 WorldObject::CalculateSpellEffectValue(Unit const* target, SpellEntry cons
     }
 
     return value;
+}
+
+float Position::GetAngle(const float x, const float y) const
+{
+    float dx = x - GetPositionX();
+    float dy = y - GetPositionY();
+
+    float ang = atan2(dy, dx);                              // returns value between -Pi..Pi
+    ang = (ang >= 0) ? ang : 2 * M_PI_F + ang;
+    return ang;
 }

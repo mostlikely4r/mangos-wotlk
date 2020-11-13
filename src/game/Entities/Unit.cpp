@@ -49,6 +49,7 @@
 #include "Movement/MoveSpline.h"
 #include "Entities/CreatureLinkingMgr.h"
 #include "Tools/Formulas.h"
+#include "Metric/Metric.h"
 
 // Playerbots
 #ifdef ENABLE_PLAYERBOTS
@@ -171,8 +172,8 @@ void MovementInfo::Read(ByteBuffer& data)
     if (HasMovementFlag(MOVEFLAG_FALLING))
     {
         data >> jump.velocity;
-        data >> jump.sinAngle;
         data >> jump.cosAngle;
+        data >> jump.sinAngle;
         data >> jump.xyspeed;
     }
 
@@ -216,8 +217,8 @@ void MovementInfo::Write(ByteBuffer& data) const
     if (HasMovementFlag(MOVEFLAG_FALLING))
     {
         data << jump.velocity;
-        data << jump.sinAngle;
         data << jump.cosAngle;
+        data << jump.sinAngle;
         data << jump.xyspeed;
     }
 
@@ -374,6 +375,14 @@ void Unit::Update(const uint32 diff)
     if (!IsInWorld())
         return;
 
+    metric::duration<std::chrono::microseconds> meas("unit.update", {
+        { "entry", std::to_string(GetEntry()) },
+        { "guid", std::to_string(GetGUIDLow()) },
+        { "unit_type", std::to_string(GetGUIDHigh()) },
+        { "map_id", std::to_string(GetMapId()) },
+        { "instance_id", std::to_string(GetInstanceId()) }
+    }, 1000);
+
     /*if(p_time > m_AurasCheck)
     {
     m_AurasCheck = 2000;
@@ -428,7 +437,17 @@ void Unit::Update(const uint32 diff)
     i_motionMaster.UpdateMotion(diff);
 
     if (AI() && IsAlive())
+    {
+        metric::duration<std::chrono::microseconds> meas_ai("unit.update.ai", {
+            { "entry", std::to_string(GetEntry()) },
+            { "guid", std::to_string(GetGUIDLow()) },
+            { "unit_type", std::to_string(GetGUIDHigh()) },
+            { "map_id", std::to_string(GetMapId()) },
+            { "instance_id", std::to_string(GetInstanceId()) }
+        }, 1000);
+
         AI()->UpdateAI(diff);   // AI not react good at real update delays (while freeze in non-active part of map)
+    }
 
     GetCombatManager().Update(diff);
 
@@ -437,28 +456,6 @@ void Unit::Update(const uint32 diff)
         ModifyAuraState(AURA_STATE_HEALTHLESS_20_PERCENT, GetHealth() < GetMaxHealth() * 0.20f);
         ModifyAuraState(AURA_STATE_HEALTHLESS_35_PERCENT, GetHealth() < GetMaxHealth() * 0.35f);
         ModifyAuraState(AURA_STATE_HEALTH_ABOVE_75_PERCENT, GetHealth() > GetMaxHealth() * 0.75f);
-    }
-}
-
-void Unit::AddCooldown(SpellEntry const& spellEntry, ItemPrototype const* /*itemProto*/, bool /*permanent*/, uint32 forcedDuration)
-{
-    uint32 recTimeDuration = forcedDuration ? forcedDuration : spellEntry.RecoveryTime;
-    if (recTimeDuration || spellEntry.CategoryRecoveryTime)
-        m_cooldownMap.AddCooldown(GetMap()->GetCurrentClockTime(), spellEntry.Id, recTimeDuration, spellEntry.Category, spellEntry.CategoryRecoveryTime);
-    else if (uint32 cooldown = sObjectMgr.GetCreatureCooldown(GetEntry(), spellEntry.Id))
-    {
-        m_cooldownMap.AddCooldown(GetMap()->GetCurrentClockTime(), spellEntry.Id, cooldown, 0, 0);
-        Player const* player = GetClientControlling();
-        if (player)
-        {
-            // send to client
-            WorldPacket data(SMSG_SPELL_COOLDOWN, 8 + 1 + 4);
-            data << GetObjectGuid();
-            data << uint8(1);
-            data << uint32(spellEntry.Id);
-            data << uint32(cooldown);
-            player->GetSession()->SendPacket(data);
-        }
     }
 }
 
@@ -589,7 +586,7 @@ bool Unit::UpdateMeleeAttackingState()
 
 void Unit::SendHeartBeat()
 {
-    m_movementInfo.UpdateTime(WorldTimer::getMSTime());
+    m_movementInfo.UpdateTime(GetMap()->GetCurrentMSTime());
     WorldPacket data(MSG_MOVE_HEARTBEAT, 64);
     data << GetPackGUID();
     data << m_movementInfo;
@@ -867,9 +864,23 @@ uint32 Unit::DealDamage(Unit* dealer, Unit* victim, uint32 damage, CleanDamage c
             static_cast<Player*>(victim)->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_TOTAL_DAMAGE_RECEIVED, damage);
 
         if (victim->GetTypeId() == TYPEID_UNIT)
+        {
             if (Creature* creatureVictim = static_cast<Creature*>(victim))
+            {
                 if (!creatureVictim->IsPet() && !creatureVictim->HasLootRecipient())
                     creatureVictim->SetLootRecipient(dealer);
+
+                if (creatureVictim->HasLootRecipient())
+                {
+                    if (Player* player = creatureVictim->GetLootRecipient())
+                    {
+                        // Note: there is evidence that pre-mop this was split between player/nonplayer instead of group/nongroup
+                        if (!dealer->IsInGroup(player))
+                            victim->m_damageByOthers += damage;
+                    }
+                }
+            }
+        }
     }
 
     if (health <= damage)
@@ -4714,16 +4725,17 @@ void Unit::_UpdateSpells(uint32 time)
 
 void Unit::_UpdateAutoRepeatSpell()
 {
-    bool isAutoShot = m_currentSpells[CURRENT_AUTOREPEAT_SPELL]->m_spellInfo->Id == SPELL_ID_AUTOSHOT;
-
-    // check movement
-    if (IsMoving())
+    // check "real time" interrupts
+    if (IsMoving() || IsNonMeleeSpellCasted(false, false, true))
     {
         if (!IsNonMeleeSpellCasted(false, false, true, false, true)) // stricter check to see if we should introduce cooldown or just return
             return;
         // cancel wand shoot
-        if (!isAutoShot)
+        if ((m_currentSpells[CURRENT_AUTOREPEAT_SPELL]->m_spellInfo->ChannelInterruptFlags & CHANNEL_FLAG_MOVEMENT) != 0)
+        {
             InterruptSpell(CURRENT_AUTOREPEAT_SPELL);
+            return;
+        }
         // set 0.5 second wind-up time.
         m_AutoRepeatFirstCast = true;
         return;
@@ -4732,23 +4744,10 @@ void Unit::_UpdateAutoRepeatSpell()
     // apply delay
     if (m_AutoRepeatFirstCast)
     {
+        RemoveSpellCooldown(*m_currentSpells[CURRENT_AUTOREPEAT_SPELL]->m_spellInfo, false);
         AddCooldown(*m_currentSpells[CURRENT_AUTOREPEAT_SPELL]->m_spellInfo, nullptr, false, 500);
         m_AutoRepeatFirstCast = false;
         return;
-    }
-
-    // check spell casts
-    if (IsNonMeleeSpellCasted(false, false, true))
-    {
-        // cancel wand shoot
-        if (!isAutoShot)
-        {
-            InterruptSpell(CURRENT_AUTOREPEAT_SPELL);
-            return;
-        }
-        // auto shot is delayed by everything, except ranged(!) CURRENT_GENERIC_SPELL's -> recheck that
-        if (!(m_currentSpells[CURRENT_GENERIC_SPELL] && m_currentSpells[CURRENT_GENERIC_SPELL]->IsRangedSpell()))
-            return;
     }
 
     // cast routine
@@ -4822,7 +4821,7 @@ void Unit::SetCurrentCastedSpell(Spell* newSpell)
             if (m_currentSpells[CURRENT_AUTOREPEAT_SPELL])
             {
                 // break autorepeat if not Auto Shot
-                if (m_currentSpells[CURRENT_AUTOREPEAT_SPELL]->m_spellInfo->Id != SPELL_ID_AUTOSHOT)
+                if (m_currentSpells[CURRENT_AUTOREPEAT_SPELL]->m_spellInfo->Category == 351) // TODO: figure out what channel interrupt flag corresponds to this
                     InterruptSpell(CURRENT_AUTOREPEAT_SPELL);
             }
         } break;
@@ -4964,7 +4963,7 @@ bool Unit::IsNonMeleeSpellCasted(bool withDelayed, bool skipChanneled, bool skip
     if (!skipAutorepeat && m_currentSpells[CURRENT_AUTOREPEAT_SPELL])
         return true;
 
-    return false;
+    return forAutoIgnore;
 }
 
 void Unit::InterruptNonMeleeSpells(bool withDelayed, uint32 spell_id)
@@ -5500,7 +5499,7 @@ void Unit::RemoveAllGroupBuffsFromCaster(ObjectGuid casterGuid)
         next = i;
         ++next;
         SpellAuraHolder* holder = (*i).second;
-        if (holder->GetCasterGuid() == casterGuid && IsGroupRestrictedBuff(holder->GetSpellProto()))
+        if ((casterGuid.IsEmpty() || holder->GetCasterGuid() == casterGuid) && IsGroupRestrictedBuff(holder->GetSpellProto()))
         {
             RemoveAurasDueToSpell((*i).first);
 
@@ -6064,6 +6063,8 @@ void Unit::RemoveNotOwnTrackedTargetAuras(uint32 newPhase)
 
 void Unit::RemoveSpellAuraHolder(SpellAuraHolder* holder, AuraRemoveMode mode)
 {
+    MANGOS_ASSERT(!holder->IsDeleted());
+
     // Statue unsummoned at holder remove
     SpellEntry const* AurSpellInfo = holder->GetSpellProto();
     Totem* statue = nullptr;
@@ -9415,7 +9416,8 @@ void Unit::SetInCombatState(bool PvP, Unit* enemy)
                     controller->AddThreat(enemy);
                     enemy->AddThreat(controller);
                     enemy->SetInCombatWith(controller);
-                    enemy->GetCombatManager().TriggerCombatTimer(controller);
+                    if (PvP || creatureNotInCombat)
+                        enemy->GetCombatManager().TriggerCombatTimer(controller);
                 }
                 else
                     controller->AI()->AttackStart(enemy);
@@ -9431,10 +9433,12 @@ void Unit::SetInCombatState(bool PvP, Unit* enemy)
 
     if (creatureNotInCombat)
     {
-        Creature* pCreature = (Creature*)this;
+        Creature* creature = static_cast<Creature*>(this);
+
+        m_damageByOthers = 0;
 
         // clear stand state if set in addon - else script has to do it on its own
-        CreatureDataAddon const* cainfo = pCreature->GetCreatureAddon();
+        CreatureDataAddon const* cainfo = creature->GetCreatureAddon();
         if (cainfo)
         {
             if (getStandState() == cainfo->bytes1)
@@ -9443,23 +9447,24 @@ void Unit::SetInCombatState(bool PvP, Unit* enemy)
                 HandleEmoteState(0);
         }
 
-        pCreature->SetCombatStartPosition(GetPosition());
+        if (creature->GetCombatStartPosition().IsEmpty())
+            creature->SetCombatStartPosition(GetPosition());
 
-        if (!pCreature->CanAggro()) // if creature aggroed during initial ignoration period, clear the state
+        if (!creature->CanAggro()) // if creature aggroed during initial ignoration period, clear the state
         {
-            pCreature->SetCanAggro(true);
+            creature->SetCanAggro(true);
             AbortAINotifyEvent();
         }
 
-        if (pCreature->AI())
-            pCreature->AI()->EnterCombat(enemy);
+        if (creature->AI())
+            creature->AI()->EnterCombat(enemy);
 
         // Some bosses are set into combat with zone
-        if (GetMap()->IsDungeon() && (pCreature->GetCreatureInfo()->ExtraFlags & CREATURE_EXTRA_FLAG_AGGRO_ZONE) && enemy && enemy->IsControlledByPlayer())
-            pCreature->SetInCombatWithZone();
+        if (GetMap()->IsDungeon() && (creature->GetCreatureInfo()->ExtraFlags & CREATURE_EXTRA_FLAG_AGGRO_ZONE) && enemy && enemy->IsControlledByPlayer())
+            creature->SetInCombatWithZone();
 
         if (InstanceData* mapInstance = GetInstanceData())
-            mapInstance->OnCreatureEnterCombat(pCreature);
+            mapInstance->OnCreatureEnterCombat(creature);
 
         TriggerAggroLinkingEvent(enemy);
     }
@@ -9496,12 +9501,12 @@ void Unit::ClearInCombat()
     RemoveAurasWithInterruptFlags(static_cast<uint32>(AURA_INTERRUPT_FLAG_LEAVE_COMBAT));
 }
 
-void Unit::HandleExitCombat()
+void Unit::HandleExitCombat(bool pvpCombat)
 {
-    if (AI() && !IsClientControlled())
+    if (AI() && !GetClientControlling())
         AI()->EnterEvadeMode();
     else
-        CombatStop();
+        CombatStop(false, !pvpCombat);
 
     CallForAllControlledUnits([](Unit* unit) { unit->HandleExitCombat(); }, CONTROLLED_PET | CONTROLLED_GUARDIANS | CONTROLLED_CHARM | CONTROLLED_TOTEMS);
 }
@@ -9674,7 +9679,7 @@ bool Unit::IsVisibleForOrDetect(Unit const* u, WorldObject const* viewPoint, boo
     }
 
     // special cases for always overwrite invisibility/stealth
-    if (invisible || m_Visibility == VISIBILITY_GROUP_STEALTH)
+    if (invisible || (m_Visibility == VISIBILITY_GROUP_STEALTH || m_Visibility == VISIBILITY_GROUP_NO_DETECT))
     {
         if (u->CanAttack(this)) // Hunter mark functionality
             if (HasAuraTypeWithCaster(SPELL_AURA_MOD_STALKED, u->GetObjectGuid()))
@@ -9794,7 +9799,7 @@ void Unit::UpdateSpeed(UnitMoveType mtype, bool forced, float ratio)
             break;
         case MOVE_RUN:
         {
-            if (IsMounted()) // Use on mount auras
+            if (IsMounted() && !IsTaxiFlying()) // Use on mount auras
             {
                 main_speed_mod  = GetMaxPositiveAuraModifier(SPELL_AURA_MOD_INCREASE_MOUNTED_SPEED);
                 stack_bonus     = GetTotalAuraMultiplier(SPELL_AURA_MOD_MOUNTED_SPEED_ALWAYS);
@@ -9819,7 +9824,7 @@ void Unit::UpdateSpeed(UnitMoveType mtype, bool forced, float ratio)
             return;
         case MOVE_FLIGHT:
         {
-            if (IsMounted()) // Use on mount auras
+            if (IsMounted() && !IsTaxiFlying()) // Use on mount auras
             {
                 main_speed_mod  = GetMaxPositiveAuraModifier(SPELL_AURA_MOD_FLIGHT_SPEED_MOUNTED);
                 stack_bonus     = GetTotalAuraMultiplier(SPELL_AURA_MOD_FLIGHT_SPEED_MOUNTED_STACKING);
@@ -11553,6 +11558,8 @@ void Unit::SetImmobilizedState(bool apply, bool stun, bool logout)
         // Prevent giving ability to move if more immobilizers are active
         if (!IsImmobilizedState())
             SendMoveRoot(false);
+
+        SetIgnoreRangedTargets(false);
     }
 }
 
@@ -12070,8 +12077,13 @@ void Unit::SetPhaseMask(uint32 newPhaseMask, bool update)
 
 void Unit::NearTeleportTo(float x, float y, float z, float orientation, bool casting /*= false*/)
 {
-    if (GetTypeId() == TYPEID_PLAYER)
-        static_cast<Player*>(this)->TeleportTo(GetMapId(), x, y, z, orientation, TELE_TO_NOT_LEAVE_TRANSPORT | TELE_TO_NOT_LEAVE_COMBAT | (casting ? TELE_TO_SPELL : 0));
+    if (IsPlayer())
+    {
+        uint32 options = TELE_TO_NOT_LEAVE_TRANSPORT | (casting ? TELE_TO_SPELL : 0);
+        if (GetDistance(x, y, z, DIST_CALC_NONE) < 100.f * 100.f)
+            options |= TELE_TO_NOT_LEAVE_COMBAT;
+        static_cast<Player*>(this)->TeleportTo(GetMapId(), x, y, z, orientation, options);
+    }
     else
     {
         DisableSpline();
@@ -12661,6 +12673,14 @@ void Unit::UpdateSplineMovement(uint32 t_diff)
     if (movespline->Finalized())
         return;
 
+    metric::duration<std::chrono::microseconds> meas("unit.updatesplinemovement", {
+        { "entry", std::to_string(GetEntry()) },
+        { "guid", std::to_string(GetGUIDLow()) },
+        { "unit_type", std::to_string(GetGUIDHigh()) },
+        { "map_id", std::to_string(GetMapId()) },
+        { "instance_id", std::to_string(GetInstanceId()) }
+    }, 1000);
+
     movespline->updateState(t_diff);
     bool arrived = movespline->Finalized();
 
@@ -13138,11 +13158,26 @@ void Unit::Uncharm(Unit* charmed, uint32 spellId)
     else
         m_charmedUnitsPrivate.erase(charmedGuid);
 
-    // may be not correct we have to remove only some generator taking account of the current situation
+    // Update movement of the victim
+    // Update crowd controlled movement if required:
+    // TODO: requires motionmster upgrade for proper handling past this line
+    // We are effectively rebuilding motion master contents: confused > fleeing > panic
     if (!IsPossessCharmType(spellId))
     {
+        const bool panic = charmed->IsInPanic(), fleeing = charmed->IsFleeing(), confused = charmed->IsConfused();
+
+        // stop any generated movement: current solution
         charmed->StopMoving(true);
-        charmed->GetMotionMaster()->Clear();
+        charmed->GetMotionMaster()->Initialize();
+
+        if (confused)
+            charmed->GetMotionMaster()->MoveConfused();
+        else if (fleeing && !panic)
+        {
+            AuraList const& fears = charmed->GetAurasByType(SPELL_AURA_MOD_FEAR);
+            Unit* source = (fears.empty() ? nullptr : fears.back()->GetCaster());
+            charmed->GetMotionMaster()->MoveFleeing(source ? source : this);
+        }
     }
 
     Creature* charmedCreature = nullptr;
@@ -13188,8 +13223,7 @@ void Unit::Uncharm(Unit* charmed, uint32 spellId)
             }
 
             // we have to restore initial MotionMaster
-            while (charmed->GetMotionMaster()->GetCurrentMovementGeneratorType() == FOLLOW_MOTION_TYPE)
-                charmed->GetMotionMaster()->MovementExpired(true);
+            charmed->GetMotionMaster()->UnMarkFollowMovegens();
         }
         else
         {
@@ -13223,6 +13257,8 @@ void Unit::Uncharm(Unit* charmed, uint32 spellId)
         charmed->DeleteThreatList();
 
         charmed->SetTarget(nullptr);
+
+        charmed->GetMotionMaster()->UnMarkFollowMovegens();
     }
 
     // Update possessed's client control status after altering flags
@@ -13307,14 +13343,11 @@ float Unit::GetAttackDistance(Unit const* pl) const
     // radius grow if playlevel < creaturelevel
     RetDistance -= (float)leveldif;
 
-    if (creaturelevel + 5 <= sWorld.getConfig(CONFIG_UINT32_MAX_PLAYER_LEVEL))
-    {
-        // detect range auras
-        RetDistance += GetTotalAuraModifier(SPELL_AURA_MOD_DETECT_RANGE);
+    // detect range auras
+    RetDistance += GetTotalAuraModifier(SPELL_AURA_MOD_DETECT_RANGE);
 
-        // detected range auras
-        RetDistance += pl->GetTotalAuraModifier(SPELL_AURA_MOD_DETECTED_RANGE);
-    }
+    // detected range auras
+    RetDistance += pl->GetTotalAuraModifier(SPELL_AURA_MOD_DETECTED_RANGE);
 
     // "Minimum Aggro Radius for a mob seems to be combat range (5 yards)"
     if (RetDistance < 5)
@@ -13578,3 +13611,16 @@ void Unit::UpdateScalingAuras()
         aura->UpdateAuraScaling();
 }
 
+uint32 Unit::GetModifierXpBasedOnDamageReceived(uint32 xp)
+{
+    if (xp && IsCreature() && GetDamageDoneByOthers())
+    {
+        uint32 health = GetMaxHealth();
+        float percentageHp = float(GetDamageDoneByOthers()) / health;
+        if (percentageHp >= 1.f)
+            xp = 0;
+        else if (percentageHp > 0.f)
+            xp *= (1.f - percentageHp);
+    }
+    return xp;
+}

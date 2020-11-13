@@ -166,7 +166,7 @@ class ChatHandler
         std::string ExtractPlayerNameFromLink(char** text);
         bool ExtractPlayerTarget(char** args, Player** player, ObjectGuid* player_guid = nullptr, std::string* player_name = nullptr);
 
-        Player* GetPlayer();
+        WorldSession* GetSession() const { return m_session; }
     protected:
         explicit ChatHandler() : m_session(nullptr), sentErrorMessage(false)
         {}      // for CLI subclass
@@ -292,7 +292,6 @@ class ChatHandler
         bool HandleDebugHaveAtClientCommand(char* args);
         bool HandleDebugIsVisibleCommand(char* args);
 
-        bool HandleDebugMaps(char* args);
         bool HandleShowTemporarySpawnList(char* args);
         bool HandleGridsLoadedCount(char* args);
 
@@ -654,6 +653,7 @@ class ChatHandler
         bool HandleTitlesCurrentCommand(char* args);
         bool HandleTitlesRemoveCommand(char* args);
         bool HandleTitlesSetMaskCommand(char* args);
+        bool HandleTitlesSwapCommand(char* args);
 
         bool HandleTriggerActiveCommand(char* args);
         bool HandleTriggerNearCommand(char* args);
@@ -727,6 +727,11 @@ class ChatHandler
         bool HandleKickPlayerCommand(char* args);
         bool HandleMailBoxCommand(char* args);
 
+        bool HandleBagsCommand(char* args);
+
+        bool HandleCombatListCommand(char* args);
+        bool HandleCombatStopCommand(char* args);
+
         bool HandleTicketDiscardCommand(char* args);
         bool HandleTicketEscalateCommand(char* args);
         bool HandleTicketGoCommand(char* args);
@@ -745,7 +750,6 @@ class ChatHandler
         bool HandleMaxSkillCommand(char* args);
         bool HandleSetSkillCommand(char* args);
         bool HandleRespawnCommand(char* args);
-        bool HandleCombatStopCommand(char* args);
         bool HandleRepairitemsCommand(char* args);
         bool HandleStableCommand(char* args);
         bool HandleWaterwalkCommand(char* args);
@@ -782,6 +786,10 @@ class ChatHandler
         // worldstate
         bool HandleWarEffortCommand(char* args);
         bool HandleExpansionRelease(char* args);
+
+        // Battleground
+        bool HandleBattlegroundStartCommand(char* args);
+        bool HandleBattlegroundStopCommand(char* args);
 
         //! Development Commands
         bool HandleSaveAllCommand(char* args);

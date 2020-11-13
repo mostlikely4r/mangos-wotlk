@@ -815,6 +815,8 @@ bool CreatureEventAI::ProcessAction(CreatureEventAI_Action const& action, uint32
                     selectFlags = SELECT_FLAG_IN_LOS;
                 if (action.cast.castFlags & CAST_PLAYER_ONLY)
                     selectFlags |= SELECT_FLAG_PLAYER;
+                if (action.cast.castFlags & CAST_AURA_NOT_PRESENT)
+                    selectFlags |= SELECT_FLAG_NOT_AURA;
             }
 
             Unit* target = GetTargetByType(action.cast.target, actionInvoker, AIEventSender, eventTarget, failedTargetSelection, spellId, selectFlags);
@@ -1209,9 +1211,9 @@ bool CreatureEventAI::ProcessAction(CreatureEventAI_Action const& action, uint32
         case ACTION_T_PAUSE_WAYPOINTS:
         {
             if (action.pauseWaypoint.doPause)
-                m_creature->addUnitState(UNIT_STAT_WAYPOINT_PAUSED);
+                m_creature->GetMotionMaster()->PauseWaypoints(0);
             else
-                m_creature->clearUnitState(UNIT_STAT_WAYPOINT_PAUSED);
+                m_creature->GetMotionMaster()->UnpauseWaypoints();
             break;
         }
         case ACTION_T_INTERRUPT_SPELL:
@@ -1348,6 +1350,10 @@ bool CreatureEventAI::ProcessAction(CreatureEventAI_Action const& action, uint32
 
 void CreatureEventAI::JustRespawned()                       // NOTE that this is called from the AI's constructor as well
 {
+    if (m_creature->IsNoAggroOnSight())
+        SetReactState(REACT_DEFENSIVE);
+    else
+        SetReactState(REACT_AGGRESSIVE);
     m_EventUpdateTime = EVENT_UPDATE_TIME;
     m_EventDiff = 0;
     m_throwAIEventStep = 0;

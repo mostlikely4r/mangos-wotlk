@@ -115,6 +115,7 @@ UPDATE gameobject_template SET ScriptName='go_brewfest_music' WHERE entry=186221
 UPDATE gameobject_template SET ScriptName='go_elemental_rift' WHERE entry IN (179664, 179665, 179666, 179667);
 UPDATE gameobject_template SET ScriptName='go_dragon_head' WHERE entry IN(179556,179558,179881,179882);
 UPDATE gameobject_template SET ScriptName='go_unadorned_spike' WHERE entry IN(175787);
+UPDATE gameobject_template SET ScriptName='go_containment_coffer' WHERE entry=122088;
 
 /* GUARD */
 UPDATE creature_template SET ScriptName='guard_azuremyst' WHERE entry=18038;
@@ -290,6 +291,7 @@ UPDATE creature_template SET ScriptName='boss_grandmaster_vorpil' WHERE entry=18
 UPDATE creature_template SET ScriptName='boss_blackheart_the_inciter' WHERE entry=18667;
 UPDATE creature_template SET ScriptName='boss_ambassador_hellmaw' WHERE entry=18731;
 UPDATE creature_template SET ScriptName='npc_void_traveler' WHERE entry=19226;
+UPDATE creature_template SET ScriptName='dummy_blackheart_the_inciter' WHERE entry IN(19300,19301,19302,19303,19304);
 UPDATE gameobject_template SET ScriptName='go_screaming_hall_door' WHERE entry=183295;
 
 /*  */
@@ -502,8 +504,10 @@ UPDATE creature_template SET ScriptName='npc_aether_tech_vendor' WHERE entry IN(
 UPDATE creature_template SET ScriptName='npc_bashir_flesh_fiend' WHERE entry IN(23249);
 UPDATE creature_template SET ScriptName='npc_disruptor_tower' WHERE entry IN(23250);
 UPDATE creature_template SET ScriptName='npc_grand_collector' WHERE entry IN(23333);
+UPDATE gameobject_template SET ScriptName='go_nether_drake_egg_trap' WHERE entry=184958;
 
 /* BLASTED LANDS */
+UPDATE creature_template SET ScriptName='boss_kazzak' WHERE entry=12397;
 UPDATE creature_template SET ScriptName='npc_agent_proudwell' WHERE entry=19942;
 UPDATE gameobject_template SET ScriptName='go_infernaling_summoner_portal_hound' WHERE entry=183357;
 
@@ -733,6 +737,7 @@ INSERT INTO scripted_event_id VALUES
 /* DRAGONBLIGHT */
 UPDATE creature_template SET ScriptName='npc_destructive_ward' WHERE entry=27430;
 UPDATE creature_template SET ScriptName='npc_crystalline_ice_giant' WHERE entry=26809;
+UPDATE gameobject_template SET ScriptName='go_scrying_orb' WHERE entry=189292;
 UPDATE gameobject_template SET ScriptName='go_portal_to_orgrimmar' WHERE entry=193948;
 UPDATE gameobject_template SET ScriptName='go_portal_to_undercity' WHERE entry=193955;
 
@@ -854,7 +859,6 @@ UPDATE instance_template SET ScriptName='instance_gundrak' WHERE map=604;
 UPDATE creature_template SET ScriptName='boss_the_maker' WHERE entry=17381;
 UPDATE creature_template SET ScriptName='boss_broggok' WHERE entry=17380;
 UPDATE creature_template SET ScriptName='boss_kelidan_the_breaker' WHERE entry=17377;
-UPDATE creature_template SET ScriptName='mob_broggok_poisoncloud' WHERE entry=17662;
 UPDATE creature_template SET ScriptName='mob_shadowmoon_channeler' WHERE entry=17653;
 UPDATE gameobject_template SET ScriptName='go_prison_cell_lever' WHERE entry=181982;
 UPDATE instance_template SET ScriptName='instance_blood_furnace' WHERE map=542;
@@ -904,6 +908,8 @@ UPDATE creature_template SET ScriptName='npc_maghar_escort' WHERE entry=17417;
 DELETE FROM scripted_event_id WHERE id=10745;
 INSERT INTO scripted_event_id VALUES(10745,'npc_vindicator_sedai');
 UPDATE gameobject_template SET ScriptName='go_kaliri_nest' WHERE entry IN(181582);
+UPDATE gameobject_template SET ScriptName='go_smoke_beacon' WHERE entry=184661;
+UPDATE creature_template SET ScriptName='npc_credit_marker_they_must_burn' WHERE entry=21173;
 
 /* HILLSBRAD FOOTHILLS */
 
@@ -1041,11 +1047,8 @@ UPDATE creature_template SET ScriptName='boss_netherspite' WHERE entry=15689;
 UPDATE creature_template SET ScriptName='boss_malchezaar' WHERE entry=15690;
 UPDATE creature_template SET ScriptName='boss_nightbane' WHERE entry=17225;
 UPDATE creature_template SET ScriptName='boss_bigbadwolf' WHERE entry=17521;
-UPDATE creature_template SET ScriptName='mob_demon_chain' WHERE entry=17248;
 UPDATE creature_template SET ScriptName='npc_fiendish_portal' WHERE entry=17265;
-UPDATE creature_template SET ScriptName='npc_shade_of_aran_blizzard' WHERE entry=17161;
 UPDATE creature_template SET ScriptName='npc_netherspite_portal' WHERE entry IN (17367,17368,17369);
-UPDATE creature_template SET ScriptName='npc_infernal_target' WHERE entry=17644;
 UPDATE creature_template SET ScriptName='npc_barnes' WHERE entry=16812;
 UPDATE creature_template SET ScriptName='npc_grandmother' WHERE entry=17603;
 UPDATE creature_template SET ScriptName='npc_image_of_medivh' WHERE entry=17651;
@@ -1066,7 +1069,6 @@ UPDATE creature_template SET ScriptName='npc_orc_necrolyte' WHERE entry=21747;
 INSERT INTO scripted_event_id VALUES
 (10591,'event_spell_summon_nightbane'),
 (10951,'event_spell_medivh_journal');
-UPDATE creature_template SET ScriptName='npc_infernal_relay' WHERE entry=17645;
 UPDATE gameobject_template SET ScriptName='go_chessboard' WHERE entry IN(185324);
 
 /* LOCH MODAN */
@@ -1130,6 +1132,7 @@ UPDATE creature_template SET ScriptName='mob_lump' WHERE entry=18351;
 UPDATE creature_template SET ScriptName='npc_nagrand_captive' WHERE entry IN (18209,18210);
 UPDATE creature_template SET ScriptName='npc_creditmarker_visit_with_ancestors' WHERE entry IN (18840,18841,18842,18843);
 UPDATE creature_template SET ScriptName='npc_rethhedron' WHERE entry=22357;
+UPDATE creature_template SET ScriptName='npc_gurthock' WHERE entry=18471;
 
 /* NAXXRAMAS */
 UPDATE instance_template SET ScriptName='instance_naxxramas' WHERE map=533;
@@ -1465,6 +1468,7 @@ UPDATE creature_template SET ScriptName='npc_mist' WHERE entry=3568;
 
 /* THE MECHANAR */
 UPDATE creature_template SET ScriptName='boss_mechano_lord_capacitus' WHERE entry = 19219;
+UPDATE creature_template SET ScriptName='mob_nether_charge' WHERE entry IN(20405);
 UPDATE creature_template SET ScriptName='boss_nethermancer_sepethrea' WHERE entry=19221;
 UPDATE creature_template SET ScriptName='boss_pathaleon_the_calculator' WHERE entry=19220;
 UPDATE creature_template SET ScriptName='mob_nether_wraith' WHERE entry=21062;
@@ -2050,27 +2054,27 @@ INSERT INTO script_texts (entry,content_default,sound,type,language,emote,broadc
 ('-1000232','Thank you! Thank you, $GPriest:Priestess;. Now I can take on those gnolls with your power to back me!','0','0','1','4','0','garments SAY_DG_KEL_THANKS'),
 ('-1000233','Farewell to you, and may shadow always protect you!','0','0','1','3','0','garments SAY_DG_KEL_GOODBYE'),
 
-('-1000234','Follow me, stranger. This won''t take long.','0','0','0','0','0','SAY_KHAD_SERV_0'),
+('-1000234','Follow me, stranger.  This won''t take long.','0','0','0','0','0','SAY_KHAD_SERV_0'),
 ('-1000235','Shattrath was once the draenei capital of this world. Its name means "dwelling of light."','0','4','0','0','0','SAY_KHAD_SERV_1'),
 ('-1000236','When the Burning Legion turned the orcs against the draenei, the fiercest battle was fought here. The draenei fought tooth and nail, but in the end the city fell.','0','4','0','0','0','SAY_KHAD_SERV_2'),
 ('-1000237','The city was left in ruins and darkness... until the Sha''tar arrived.','0','4','0','0','0','SAY_KHAD_SERV_3'),
-('-1000238','Let us go into the Lower City. I will warn you that as one of the only safe havens in Outland, Shattrath has attracted droves of refugees from all wars, current and past.','0','4','0','0','0','SAY_KHAD_SERV_4'),
+('-1000238','Let us go into the Lower City.  I will warn you that as one of the only safe havens in Outland, Shattrath has attracted droves of refugees from all wars, current and past.','0','4','0','0','0','SAY_KHAD_SERV_4'),
 ('-1000239','The Sha''tar, or "born from light" are the naaru that came to Outland to fight the demons of the Burning Legion.','0','4','0','0','0','SAY_KHAD_SERV_5'),
 ('-1000240','They were drawn to the ruins of Shattrath City where a small remnant of the draenei priesthood conducted its rites inside a ruined temple on this very spot.','0','4','0','0','0','SAY_KHAD_SERV_6'),
-('-1000241','The priesthood, known as the Aldor, quickly regained its strength as word spread that the naaru had returned and reconstruction soon began. The ruined temple is now used as an infirmary for injured refugees.','0','4','0','0','0','SAY_KHAD_SERV_7'),
-('-1000242','It wouldn''t be long, however, before the city came under attack once again. This time, the attack came from Illidan''s armies. A large regiment of blood elves had been sent by Illidan''s ally, Kael''thas Sunstrider, to lay waste to the city.','0','4','0','0','0','SAY_KHAD_SERV_8'),
-('-1000243','As the regiment of blood elves crossed this very bridge, the Aldor''s exarchs and vindicators lined up to defend the Terrace of Light. But then the unexpected happened.','0','4','0','0','0','SAY_KHAD_SERV_9'),
+('-1000241','The priesthood, known as the Aldor, quickly regained its strength as word spread that the naaru had returned and reconstruction soon began.  The ruined temple is now used as an infirmary for injured refugees.','0','4','0','0','0','SAY_KHAD_SERV_7'),
+('-1000242','It wouldn''t be long, however, before the city came under attack once again.  This time, the attack came from Illidan''s armies. A large regiment of blood elves had been sent by Illidan''s ally, Kael''thas Sunstrider, to lay waste to the city.','0','4','0','0','0','SAY_KHAD_SERV_8'),
+('-1000243','As the regiment of blood elves crossed this very bridge, the Aldor''s exarchs and vindicators lined up to defend the Terrace of Light.  But then the unexpected happened.','0','4','0','0','0','SAY_KHAD_SERV_9'),
 ('-1000244','The blood elves laid down their weapons in front of the city''s defenders; their leader, a blood elf elder known as Voren''thal, stormed into the Terrace of Light and demanded to speak to A''dal.','0','4','0','0','0','SAY_KHAD_SERV_10'),
-('-1000245','As the naaru approached him, Voren''thal kneeled before him and uttered the following words: "I''ve seen you in a vision, naaru. My race''s only hope for survival lies with you. My followers and I are here to serve you."','0','4','0','0','0','SAY_KHAD_SERV_11'),
-('-1000246','The defection of Voren''thal and his followers was the largest loss ever incurred by Kael''s forces. And these weren''t just any blood elves. Many of the best and brightest amongst Kael''s scholars and magisters had been swayed by Voren''thal''s influence.','0','4','0','0','0','SAY_KHAD_SERV_12'),
-('-1000247','The naaru accepted the defectors, who would become known as the Scryers; their dwelling lies in the platform above. Only those initiated with the Scryers are allowed there.','0','4','0','0','0','SAY_KHAD_SERV_13'),
+('-1000245','As the naaru approached him, Voren''thal kneeled before him and uttered the following words: "I''ve seen you in a vision, naaru. My race''s only hope for survival lies with you. My followers and I are here to serve you.""','0','4','0','0','0','SAY_KHAD_SERV_11'),
+('-1000246','The defection of Voren''thal and his followers was the largest loss ever incurred by Kael''s forces. And these weren''t just any blood elves.  Many of the best and brightest amongst Kael''s scholars and magisters had been swayed by Voren''thal''s influence.','0','4','0','0','0','SAY_KHAD_SERV_12'),
+('-1000247','The naaru accepted the defectors, who would be known as the Scryers; their dwelling lies in the platform above.  Only those initiated with the Scryers are allowed there.','0','4','0','0','0','SAY_KHAD_SERV_13'),
 ('-1000248','The Aldor are followers of the Light and forgiveness and redemption are values they understand. However, they found hard to forget the deeds of the blood elves while under Kael''s command.','0','4','0','0','0','SAY_KHAD_SERV_14'),
-('-1000249','Many of the priesthood had been slain by the same magisters who now vowed to serve the naaru. They were not happy to share the city with their former enemies.','0','4','0','0','0','SAY_KHAD_SERV_15'),
-('-1000250','The Aldor''s most holy temple and its surrounding dwellings lie on the terrace above. As a holy site, only the initiated are welcome inside.','0','4','0','0','0','SAY_KHAD_SERV_16'),
+('-1000249','Many of the priesthood had been slain by the same magisters who now vowed to serve the naaru.  They were not happy to share the city with their former enemies.','0','4','0','0','0','SAY_KHAD_SERV_15'),
+('-1000250','The Aldor''s most holy temple and its surrounding dwellings lie on the terrace above.  As a holy site, only the initiated are welcome inside.','0','4','0','0','0','SAY_KHAD_SERV_16'),
 ('-1000251','The attacks against Shattrath continued, but the city did not fall, as you can see. On the contrary, the naaru known as Xi''ri led a successful incursion into Shadowmoon Valley - Illidan''s doorstep.','0','4','0','0','0','SAY_KHAD_SERV_17'),
-('-1000252','There he continues to wage war on Illidan with the assistance of the Aldor and the Scryers. The two factions have not given up on their old feuds, though.','0','4','0','0','0','SAY_KHAD_SERV_18'),
-('-1000253','Such is their animosity that they vie for the honor of being sent to assist the naaru there. Each day, that decision is made here by A''dal. The armies gather here to receive A''dal''s blessing before heading to Shadowmoon.','0','4','0','0','0','SAY_KHAD_SERV_19'),
-('-1000254','Khadgar should be ready to see you again. Just remember that to serve the Sha''tar you will most likely have to ally with the Aldor or the Scryers. And seeking the favor of one group will cause the others'' dislike.','0','4','0','0','0','SAY_KHAD_SERV_20'),
+('-1000252','There he continues to wage war on Illidan with the assistance of the Aldor and the Scryers.  The two factions have not given up on their old feuds, though.','0','4','0','0','0','SAY_KHAD_SERV_18'),
+('-1000253','Such is their animosity that they vie for the honor of being sent to assist the naaru there. Each day, that decision is made here by A''dal.  The armies gather here to receive A''dal''s blessing before heading to Shadowmoon.','0','4','0','0','0','SAY_KHAD_SERV_19'),
+('-1000254','Khadgar should be ready to see you again.  Just remember that to serve the Sha''tar you will most likely have to ally with the Aldor or the Scryers. And seeking the favor of one group will cause the others'' dislike.','0','4','0','0','0','SAY_KHAD_SERV_20'),
 ('-1000255','Good luck stranger, and welcome to Shattrath City.','0','4','0','0','0','SAY_KHAD_SERV_21'),
 
 ('-1000256','Thank you! Thank you, $GPriest:Priestess;. Now I can take on those murlocs with the Light on my side!','0','0','7','4','0','garments SAY_ROBERTS_THANKS'),
@@ -2349,7 +2353,7 @@ INSERT INTO script_texts (entry,content_default,sound,type,language,emote,broadc
 ('-1000495','Khadgar himself is showing you around? You must have made a good impression, $n.','0','0','0','0','0','SAY_KHAD_HAGGARD'),
 
 ('-1000496','%s lifts its head into the air, as if listening for something.','0','2','0','0','0','ancestral wolf EMOTE_WOLF_LIFT_HEAD'),
-('-1000497','%s lets out a howl that rings across the mountains to the north and motions for you to follow.','0','2','0','0','0','ancestral wolf EMOTE_WOLF_HOWL'),
+('-1000497','%s lets out a howl that rings across the mountains to the north and motions for you to follow.','9036','2','0','0','0','ancestral wolf EMOTE_WOLF_HOWL'),
 ('-1000498','Welcome, kind spirit. What has brought you to us?','0','0','0','0','0','ancestral wolf SAY_WOLF_WELCOME'),
 
 ('-1000499','Puny $r wanna fight %s? Me beat you! Me boss here!','0','0','1','0','0','morokk SAY_MOR_CHALLENGE'),
@@ -2390,13 +2394,13 @@ INSERT INTO script_texts (entry,content_default,sound,type,language,emote,broadc
 
 ('-1000532','At your command, my liege...','0','0','0','0','0','torloth TORLOTH_DIALOGUE1'),
 ('-1000533','As you desire, Lord Illidan.','0','0','0','0','0','torloth TORLOTH_DIALOGUE2'),
-('-1000534','Yes, Lord Illidan, I would sacrifice to you this magnificent physique. On this day you will fall - another victim of Torloth...','0','0','0','0','0','torloth TORLOTH_DIALOGUE3'),
+('-1000534','For Lord Illidan, I would sacrifice even this magnificent physique. On this day, you will fall - another victim of Torloth...','0','0','0','25','0','torloth TORLOTH_DIALOGUE3'),
 ('-1000535','Destroy them, Torloth. Let loose their blood like a river upon this hallowed ground.','0','0','0','0','0','lordillidan ILLIDAN_DIALOGUE'),
 ('-1000536','What manner of fool dares stand before Illidan Stormrage? Soldiers, destroy these insects!','0','1','0','0','0','lordillidan ILLIDAN_SUMMON1'),
 ('-1000537','You are no challenge for the Crimson Sigil. Mind breakers, end this nonsense.','0','1','0','0','0','lordillidan ILLIDAN_SUMMON2'),
 ('-1000538','Run while you still can. The highlords come soon...','0','1','0','0','0','lordillidan ILLIDAN_SUMMON3'),
-('-1000539','Torloth your master calls!','0','1','0','0','0','lordillidan ILLIDAN_SUMMON4'),
-('-1000540','So you have defeated the Crimson Sigil. You now seek to challenge my rule? Not even Arthas could defeat me, yet you dare to even harbor such thoughts? Then I say to you, come! Come $N! The Black Temple awaits...','0','1','0','0','0','lordillidan EVENT_COMPLETED'),
+('-1000539','Torloth, your master calls!','0','1','0','0','0','lordillidan ILLIDAN_SUMMON4'),
+('-1000540','So you have defeated the Crimson Sigil. You now seek to challenge my rule? Not even Arthas could defeat me, yet you dare to even harbor such thoughts? Then I say to you, come! Come $n! The Black Temple awaits...','0','1','0','0','0','lordillidan EVENT_COMPLETED'),
 
 ('-1000541','%s jumps into the moonwell and goes underwater...','0','2','0','0','0','kitten EMOTE_SAB_JUMP'),
 ('-1000542','%s follows $n obediently.','0','2','0','0','0','kitten EMOTE_SAB_FOLLOW'),
@@ -3410,7 +3414,13 @@ INSERT INTO script_texts (entry,content_default,sound,type,language,emote,broadc
 ('-1015096','These fiends will fail!  For Azeroth!','0','0','0','0','16621','melgromm highmountain MH_RANDOM_4'),
 ('-1015097','If it is our fate to die this day, then we will not go easy!  Mark me, these demons will fall like wheat!','0','0','0','0','16622','melgromm highmountain MH_RANDOM_5'),
 ('-1015098','Though your sinews tire and your blood flows from cuts and wounds to this sodden ground, you fight for the spirits of your world.  No evil force can stand against us!','0','0','0','0','16624','melgromm highmountain MH_RANDOM_6'),
-('-1015099','My brethren, my comrades-in-arms!  I must go to seek the forces of the Horde and direct them here!  Keep your spirits strong, brave hunters!  Do not fall to the portal-spawned fiends!','0','0','0','0','16935','melgromm highmountain MH_DESPAWN');
+('-1015099','My brethren, my comrades-in-arms!  I must go to seek the forces of the Horde and direct them here!  Keep your spirits strong, brave hunters!  Do not fall to the portal-spawned fiends!','0','0','0','0','16935','melgromm highmountain MH_DESPAWN'),
+
+('-1015100','Mooooo...','0','0','0','0','18179','bessy SAY_ESCORT_1'),
+('-1015101','Moooooooooo!','0','0','0','0','18180','bessy SAY_ESCORT_2'),
+('-1015102','Bessy, you''re home. Thank the Light!','0','0','0','0','18181','bessy SAY_THADELL'),
+('-1015103','Quickly, get to the middle of the platform! Illidan''s fury is soon to be unleashed!','0','4','0','0','0','Marcus Auralion - On Accept'),
+('-1015104','[Demonic] Ka kalix!','0','0','0','0','15551','Sal''salabim - On Gossip Select');
 
 -- -1 020 000 WOTLK texts
 INSERT INTO script_texts (entry,content_default,sound,type,language,emote,broadcast_text_id,comment) VALUES
@@ -4582,27 +4592,25 @@ INSERT INTO script_texts (entry,content_default,sound,type,language,emote,broadc
 
 -- -1 542 000 BLOOD FURNACE
 INSERT INTO script_texts (entry,content_default,sound,type,language,emote,broadcast_text_id,comment) VALUES
-('-1542000','Who dares interrupt... What is this? What have you done? You ruin everything!','10164','1','0','0','0','kelidan SAY_WAKE'),
-('-1542001','You mustn''t let him loose!','10166','1','0','0','0','kelidan SAY_ADD_AGGRO_1'),
-('-1542002','Ignorant whelps!','10167','1','0','0','0','kelidan SAY_ADD_AGGRO_2'),
-('-1542003','You fools! He''ll kill us all!','10168','1','0','0','0','kelidan SAY_ADD_AGGRO_3'),
-('-1542004','Just as you deserve!','10169','1','0','0','0','kelidan SAY_KILL_1'),
-('-1542005','Your friends will soon be joining you.','10170','1','0','0','0','kelidan SAY_KILL_2'),
-('-1542006','Closer... Come closer.. and burn!','10165','1','0','0','0','kelidan SAY_NOVA'),
-('-1542007','Good luck... you''ll need it..','10171','1','0','0','0','kelidan SAY_DIE'),
+('-1542000','Who dares interrupt--What is this; what have you done? You''ll ruin everything!','10164','1','0','0','15130','kelidan SAY_WAKE'),
+('-1542001','You mustn''t let him loose!','10166','1','0','0','17673','kelidan SAY_ADD_AGGRO_1'),
+('-1542002','Ignorant whelps!','10167','1','0','0','17674','kelidan SAY_ADD_AGGRO_2'),
+('-1542003','You fools! He''ll kill us all!','10168','1','0','0','17675','kelidan SAY_ADD_AGGRO_3'),
+('-1542004','Just as you deserve!','10169','1','0','0','17670','kelidan SAY_KILL_1'),
+('-1542005','Your friends will soon be joining you.','10170','1','0','0','17671','kelidan SAY_KILL_2'),
+('-1542006','Closer! Come closer... and burn!','10165','1','0','0','15132','kelidan SAY_NOVA'),
+('-1542007','Good...luck. You''ll need it.','10171','1','0','0','17672','kelidan SAY_DIE'),
 
 ('-1542008','Come intruders....','0','1','0','0','0','broggok SAY_AGGRO'),
 
-('-1542009','My work must not be interrupted.','10286','1','0','0','0','the_maker SAY_AGGRO_1'),
-('-1542010','Perhaps I can find a use for you.','10287','1','0','0','0','the_maker SAY_AGGRO_2'),
-('-1542011','Anger... Hate... These are tools I can use.','10288','1','0','0','0','the_maker SAY_AGGRO_3'),
-('-1542012','Let''s see what I can make of you.','10289','1','0','0','0','the_maker SAY_KILL_1'),
-('-1542013','It is pointless to resist.','10290','1','0','0','0','the_maker SAY_KILL_2'),
-('-1542014','Stay away from... me.','10291','1','0','0','0','the_maker SAY_DIE'),
+('-1542009','My work must not be interrupted!','10286','1','0','0','17679','the_maker SAY_AGGRO_1'),
+('-1542010','Perhaps I can find a use for you...','10287','1','0','0','17680','the_maker SAY_AGGRO_2'),
+('-1542011','Anger...hate... These are tools I can use.','10288','1','0','0','17681','the_maker SAY_AGGRO_3'),
+('-1542012','Let''s see what I can make of you!','10289','1','0','0','17683','the_maker SAY_KILL_1'),
+('-1542013','It is pointless to resist.','10290','1','0','0','17684','the_maker SAY_KILL_2'),
+('-1542014','Stay away from... Me!','10291','1','0','0','17685','the_maker SAY_DIE'),
 
-('-1542015','Kill them!','0','1','0','0','0','broggok SAY_BROGGOK_INTRO'),
-
-('-1542016','How long do you beleive your pathetic sorcery can hold me?','0','6','0','0','0','magtheridon SAY_MAGTHERIDON_WARN');
+('-1542015','Kill them!','0','1','0','0','15115','broggok SAY_BROGGOK_INTRO');
 
 -- -1 543 000 HELLFIRE RAMPARTS
 INSERT INTO script_texts (entry,content_default,sound,type,language,emote,broadcast_text_id,comment) VALUES
@@ -4625,15 +4633,15 @@ INSERT INTO script_texts (entry,content_default,sound,type,language,emote,broadc
 ('-1543015','It is... not over.','10284','1','0','0','0','omor SAY_DIE'),
 ('-1543016','I am victorious!','10283','1','0','0','0','omor SAY_WIPE'),
 
-('-1543017','You have faced many challenges, pity they were all in vain. Soon your people will kneel to my lord!','10292','1','0','0','0','vazruden SAY_INTRO'),
+('-1543017','You have faced many challenges.... Pity they were all in vain! Soon your people will kneel to MY lord!','10292','1','0','0','0','vazruden SAY_INTRO'),
 ('-1543018','Your time is running out!','10294','1','0','0','0','vazruden SAY_AGGRO1'),
-('-1543019','You are nothing, I answer a higher call!','10295','1','0','0','0','vazruden SAY_AGGRO2'),
+('-1543019','You are nothing! I answer a higher call....','10295','1','0','0','0','vazruden SAY_AGGRO2'),
 ('-1543020','The Dark Lord laughs at you!','10296','1','0','0','0','vazruden SAY_AGGRO3'),
 ('-1543021','Is there no one left to test me?','10293','1','0','0','0','vazruden SAY_TAUNT'),
 ('-1543022','It is over. Finished!','10297','1','0','0','0','vazruden SAY_KILL1'),
 ('-1543023','Your days are done!','10298','1','0','0','0','vazruden SAY_KILL2'),
-('-1543024','My lord will be the end you all...','10299','1','0','0','0','vazruden SAY_DEATH'),
-('-1543025','%s descends from the sky.','0','3','0','0','0','vazruden EMOTE_DESCEND');
+('-1543024','My lord will be... the end of you all!','10299','1','0','0','0','vazruden SAY_DEATH'),
+('-1543025','Nazan descends from the sky.','0','3','0','0','0','vazruden EMOTE_DESCEND');
 
 -- -1 544 000 MAGTHERIDON'S LAIR
 INSERT INTO script_texts (entry,content_default,sound,type,language,emote,broadcast_text_id,comment) VALUES
@@ -4833,8 +4841,8 @@ INSERT INTO script_texts (entry,content_default,sound,type,language,emote,broadc
 ('-1552008','We span the universe, as countless as the stars!','11131','1','0','0','0','skyriss SAY_IMAGE'),
 ('-1552009','I am merely one of... infinite multitudes.','11126','1','0','0','0','skyriss SAY_DEATH'),
 
-('-1552010','Where in Bonzo''s brass buttons am I? And who are-- yaaghh, that''s one mother of a headache!','11171','1','0','0','0','millhouse SAY_INTRO_1'),
-('-1552011','"Lowly"? I don''t care who you are friend, no one refers to the mighty Millhouse Manastorm as "Lowly"! I have no idea what goes on here, but I will gladly join your fight against this impudent imbecile! Prepare to defend yourself, cretin!','11172','1','0','0','0','millhouse SAY_INTRO_2'),
+('-1552010','Where in Bonzo''s Brass Buttons am I? And who are-- yaaghh, that''s one mother of a headache!','11171','1','0','6','0','millhouse SAY_INTRO_1'),
+('-1552011','"Lowly"? I don''t care who you are friend, no one refers to the mighty Millhouse Manastorm as "Lowly"! I have no idea what goes on here, but I will gladly join your fight against this impudent imbecile! Prepare to defend yourself, cretin!','11172','1','0','5','0','millhouse SAY_INTRO_2'),
 ('-1552012','I just need to get some things ready first. You guys go ahead and get started. I need to summon up some water...','11173','1','0','0','0','millhouse SAY_WATER'),
 ('-1552013','Fantastic! Next, some protective spells. Yes! Now we''re cookin''','11174','1','0','0','0','millhouse SAY_BUFFS'),
 ('-1552014','And of course i''ll need some mana. You guys are gonna love this, just wait.','11175','1','0','0','0','millhouse SAY_DRINK'),
@@ -4845,7 +4853,7 @@ INSERT INTO script_texts (entry,content_default,sound,type,language,emote,broadc
 ('-1552019','Ice, ice, baby!','11180','1','0','0','0','millhouse SAY_ICEBLOCK'),
 ('-1552020','Heal me! Oh, for the love of all that is holy, HEAL me! I''m dying!','11181','1','0','0','0','millhouse SAY_LOWHP'),
 ('-1552021','You''ll be hearing from my lawyer...','11182','1','0','0','0','millhouse SAY_DEATH'),
-('-1552022','Who''s bad? Who''s bad? That''s right: we bad!','11183','1','0','0','0','millhouse SAY_COMPLETE'),
+('-1552022','Who''s bad? Who''s bad? That''s right: we bad!','11183','1','0','4','0','millhouse SAY_COMPLETE'),
 
 ('-1552023','I knew the prince would be angry but, I... I have not been myself. I had to let them out! The great one speaks to me, you see. Wait--outsiders. Kael''thas did not send you! Good... I''ll just tell the prince you released the prisoners!','11222','1','0','0','0','mellichar YELL_INTRO1'),
 ('-1552024','The naaru kept some of the most dangerous beings in existence here in these cells. Let me introduce you to another...','11223','1','0','0','0','mellichar YELL_INTRO2'),
@@ -7669,7 +7677,7 @@ INSERT INTO gossip_texts (entry,content_default,comment) VALUES
 --
 
 TRUNCATE script_waypoint;
-INSERT INTO script_waypoint VALUES
+INSERT INTO `script_waypoint` (`entry`, `pathId`, `pointid`, `position_x`, `position_y`, `position_z`, `orientation`, `waittime`, `script_id`, `comment`) VALUES
 (349,0,1,-8769.59,-2185.73,141.975,0,0,0,''),
 (349,0,2,-8776.54,-2193.78,140.96,0,0,0,''),
 (349,0,3,-8783.29,-2194.82,140.462,0,0,0,''),
@@ -8354,7 +8362,7 @@ INSERT INTO script_waypoint VALUES
 (4983,0,21,-3336.98,-3129.61,30.692,0,0,0,''),
 (4983,0,22,-3326.34,-3126.83,34.426,0,0,0,''),
 (4983,0,23,-3322.65,-3124.63,33.842,0,0,0,''),
-(5391,0,1,-9901.12,-3727.29,22.11,0,3000,0,''),
+(5391,0,1,-9901.12,-3727.29,22.11,3.8316,3000,0,'Galen Goodward - Escort starts'),
 (5391,0,2,-9909.27,-3727.81,23.25,0,0,0,''),
 (5391,0,3,-9935.25,-3729.02,22.11,0,0,0,''),
 (5391,0,4,-9945.83,-3719.34,21.68,0,0,0,''),
@@ -8373,9 +8381,10 @@ INSERT INTO script_waypoint VALUES
 (5391,0,17,-10052.9,-3479.13,21.67,0,0,0,''),
 (5391,0,18,-10060.7,-3460.31,21.67,0,0,0,''),
 (5391,0,19,-10074.7,-3436.85,20.97,0,0,0,''),
-(5391,0,20,-10074.7,-3436.85,20.97,0,0,0,''),
-(5391,0,21,-10072.9,-3408.92,20.43,0,15000,0,''),
-(5391,0,22,-10108,-3406.05,22.06,0,0,0,''),
+(5391,0,20,-10074.7,-3436.85,20.97,0,0,0,'Galen Goodward - Set Run'),
+(5391,0,21,-10072.9,-3408.92,20.43,2.8412,1000,0,'Galen Goodward - Escort complete and SAY_QUEST_COMPLETE'),
+(5391,0,22,-10078.2,-3407.64,20.44,0,0,0,'Galen Goodward - EMOTE_DISAPPEAR'),
+(5391,0,23,-10108,-3406.05,22.06,0,1000,0,'Galen Goodward - Despawn'),
 (5644,0,1,-339.679,1752.04,139.482,0,0,0,''),
 (5644,0,2,-328.957,1734.95,139.327,0,0,0,''),
 (5644,0,3,-338.29,1731.36,139.327,0,0,0,''),
@@ -10074,82 +10083,83 @@ INSERT INTO script_waypoint VALUES
 (19671,0,43,-67.692,-76.665,-0.941,0,0,0,''),
 (19671,0,44,-67.624,-56.025,-0.844,0,0,0,'quest complete'),
 (19671,0,45,-64.493,-15.776,-0.943,0,0,0,''),
-(19685,0,1,-1860.54,5416.99,-10.48,0,2500,0,''),
-(19685,0,2,-1855.9,5412.81,-12.427,0,0,0,'SAY_KHAD_SERV_0'),
-(19685,0,3,-1845.52,5385.35,-12.427,0,0,0,''),
-(19685,0,4,-1815.25,5340.26,-12.427,0,0,0,''),
-(19685,0,5,-1799.34,5312.78,-12.427,0,0,0,''),
-(19685,0,6,-1780.49,5278.54,-33.877,0,2500,0,'pause'),
-(19685,0,7,-1776.06,5270.25,-38.809,0,0,0,''),
-(19685,0,8,-1772.22,5262.78,-38.81,0,0,0,''),
-(19685,0,9,-1762.2,5261.72,-38.85,0,0,0,''),
-(19685,0,10,-1759.24,5259.75,-40.208,0,0,0,''),
-(19685,0,11,-1743.43,5259.66,-40.208,0,0,0,''),
-(19685,0,12,-1744.36,5251.18,-44.523,0,0,0,''),
-(19685,0,13,-1740.12,5240.12,-47.74,0,0,0,''),
-(19685,0,14,-1737.64,5238.29,-49.793,0,0,0,''),
-(19685,0,15,-1727.41,5233.87,-50.477,0,0,0,''),
-(19685,0,16,-1707.49,5230.44,-51.05,0,0,0,''),
-(19685,0,17,-1684.12,5223.63,-49.415,0,0,0,''),
-(19685,0,18,-1669.97,5221.93,-46.336,0,0,0,''),
-(19685,0,19,-1662.87,5221.71,-44.959,0,0,0,''),
-(19685,0,20,-1657.17,5225.21,-45.708,0,0,0,''),
-(19685,0,21,-1645.03,5238.36,-40.212,0,0,0,''),
-(19685,0,22,-1631.66,5252.76,-40.962,0,0,0,''),
-(19685,0,23,-1631.37,5276.54,-41.032,0,0,0,''),
-(19685,0,24,-1621.73,5298.55,-40.209,0,0,0,''),
-(19685,0,25,-1615.5,5298.1,-40.209,0,2500,0,'pause'),
-(19685,0,26,-1636.98,5302.68,-40.209,0,0,0,''),
-(19685,0,27,-1655.33,5315.74,-40.207,0,0,0,''),
-(19685,0,28,-1656.88,5321.65,-40.209,0,0,0,''),
-(19685,0,29,-1663.98,5335.21,-46.526,0,0,0,''),
-(19685,0,30,-1659.14,5359.13,-45.846,0,0,0,''),
-(19685,0,31,-1644.21,5390.89,-45.542,0,0,0,''),
-(19685,0,32,-1646.18,5405.27,-44.649,0,0,0,''),
-(19685,0,33,-1650.2,5414.54,-46.324,0,0,0,''),
-(19685,0,34,-1656.05,5424.68,-40.461,0,0,0,''),
-(19685,0,35,-1661.63,5423.93,-40.405,0,0,0,''),
-(19685,0,36,-1664.65,5423.66,-38.848,0,0,0,''),
-(19685,0,37,-1681.77,5426,-38.809,0,0,0,''),
-(19685,0,38,-1729.79,5427.25,-12.445,0,0,0,''),
-(19685,0,39,-1735.37,5423.66,-12.427,0,0,0,''),
-(19685,0,40,-1741.63,5386.77,-12.427,0,0,0,''),
-(19685,0,41,-1764.79,5363.74,-12.427,0,0,0,''),
-(19685,0,42,-1816.37,5340.66,-12.427,0,0,0,''),
-(19685,0,43,-1880.02,5309.8,-12.427,0,0,0,''),
-(19685,0,44,-1887.37,5315.43,-12.427,0,0,0,''),
-(19685,0,45,-1888.77,5324.52,-5.146,0,0,0,''),
-(19685,0,46,-1888.4,5334.15,0.151,0,0,0,''),
-(19685,0,47,-1890.22,5337.66,0.921,0,0,0,''),
-(19685,0,48,-1897.54,5323.04,1.256,0,0,0,''),
-(19685,0,49,-1900.25,5319.8,0.831,0,0,0,''),
-(19685,0,50,-1910.04,5291.26,1.288,0,0,0,''),
-(19685,0,51,-1915.22,5275.57,2.502,0,2500,0,'pause'),
-(19685,0,52,-1927.23,5273.25,2.703,0,0,0,''),
-(19685,0,53,-1926.98,5278.47,0.109,0,0,0,''),
-(19685,0,54,-1927.67,5299.21,-12.427,0,0,0,''),
-(19685,0,55,-1922.84,5319.26,-12.427,0,0,0,''),
-(19685,0,56,-1925.78,5347.41,-12.427,0,0,0,''),
-(19685,0,57,-1954.91,5384.23,-12.427,0,0,0,''),
-(19685,0,58,-1966.73,5428.2,-12.427,0,0,0,''),
-(19685,0,59,-1979.48,5448.42,-12.427,0,0,0,''),
-(19685,0,60,-1977.53,5453.86,-12.385,0,0,0,''),
-(19685,0,61,-1968.06,5455.78,-4.343,0,0,0,''),
-(19685,0,62,-1959.22,5454.9,0.202,0,0,0,''),
-(19685,0,63,-1954.63,5457.01,0.9,0,0,0,''),
-(19685,0,64,-1967.76,5464.95,1.22,0,2500,0,'pause'),
-(19685,0,65,-1952.87,5462.96,0.956,0,0,0,''),
-(19685,0,66,-1955.34,5467.12,0.445,0,0,0,''),
-(19685,0,67,-1962.03,5472.8,-4.243,0,0,0,''),
-(19685,0,68,-1968.01,5480.91,-12.427,0,0,0,''),
-(19685,0,69,-1945.9,5515.95,-12.427,0,0,0,''),
-(19685,0,70,-1874.87,5549.78,-12.427,0,0,0,''),
-(19685,0,71,-1840.64,5544.23,-12.427,0,0,0,''),
-(19685,0,72,-1838.96,5536.06,-5.639,0,0,0,''),
-(19685,0,73,-1839.58,5525.63,0.193,0,0,0,''),
-(19685,0,74,-1837.93,5521.12,0.844,0,0,0,''),
-(19685,0,75,-1829.18,5533.43,1.209,0,2500,0,'pause'),
-(19685,0,76,-1848.4,5476.07,0.856,0,40000,0,'end'),
+(19685,0,1,-1856.448,5412.245,-12.18742,0,0,0,''),
+(19685,0,2,-1849.448,5400.995,-12.18742,0,0,0,''),
+(19685,0,3,-1843.448,5389.745,-12.18742,0,0,0,''),
+(19685,0,4,-1830.198,5363.245,-12.18742,0,0,0,''),
+(19685,0,5,-1817.948,5337.745,-12.18742,0,0,0,''),
+(19685,0,6,-1798.698,5309.745,-13.93742,0,0,0,''),
+(19685,0,7,-1779.544,5277.36,-34.69139,100,2500,0,'pause'),
+(19685,0,8,-1776.06,5270.25,-38.809,0,0,0,''),
+(19685,0,9,-1772.22,5262.78,-38.81,0,0,0,''),
+(19685,0,10,-1762.2,5261.72,-38.85,0,0,0,''),
+(19685,0,11,-1759.24,5259.75,-40.208,0,0,0,''),
+(19685,0,12,-1743.43,5259.66,-40.208,0,0,0,''),
+(19685,0,13,-1744.36,5251.18,-44.523,0,0,0,''),
+(19685,0,14,-1740.12,5240.12,-47.74,0,0,0,''),
+(19685,0,15,-1737.64,5238.29,-49.793,0,0,0,''),
+(19685,0,16,-1727.41,5233.87,-50.477,0,0,0,''),
+(19685,0,17,-1707.49,5230.44,-51.05,0,0,0,''),
+(19685,0,18,-1684.12,5223.63,-49.415,0,0,0,''),
+(19685,0,19,-1669.97,5221.93,-46.336,0,0,0,''),
+(19685,0,20,-1662.87,5221.71,-44.959,0,0,0,''),
+(19685,0,21,-1657.17,5225.21,-45.708,0,0,0,''),
+(19685,0,22,-1645.03,5238.36,-40.212,0,0,0,''),
+(19685,0,23,-1631.66,5252.76,-40.962,0,0,0,''),
+(19685,0,24,-1631.37,5276.54,-41.032,0,0,0,''),
+(19685,0,25,-1621.73,5298.55,-40.209,0,0,0,''),
+(19685,0,26,-1614.27,5298.1,-40.20916,100,2500,0,'pause'),
+(19685,0,27,-1636.98,5302.68,-40.209,0,0,0,''),
+(19685,0,28,-1655.33,5315.74,-40.207,0,0,0,''),
+(19685,0,29,-1656.88,5321.65,-40.209,0,0,0,''),
+(19685,0,30,-1663.98,5335.21,-46.526,0,0,0,''),
+(19685,0,31,-1659.14,5359.13,-45.846,0,0,0,''),
+(19685,0,32,-1644.21,5390.89,-45.542,0,0,0,''),
+(19685,0,33,-1646.18,5405.27,-44.649,0,0,0,''),
+(19685,0,34,-1650.2,5414.54,-46.324,0,0,0,''),
+(19685,0,35,-1656.05,5424.68,-40.461,0,0,0,''),
+(19685,0,36,-1661.63,5423.93,-40.405,0,0,0,''),
+(19685,0,37,-1664.65,5423.66,-38.848,0,0,0,''),
+(19685,0,38,-1681.77,5426,-38.809,0,0,0,''),
+(19685,0,39,-1729.79,5427.25,-12.445,0,0,0,''),
+(19685,0,40,-1735.37,5423.66,-12.427,0,0,0,''),
+(19685,0,41,-1741.63,5386.77,-12.427,0,0,0,''),
+(19685,0,42,-1764.79,5363.74,-12.427,0,0,0,''),
+(19685,0,43,-1816.37,5340.66,-12.427,0,0,0,''),
+(19685,0,44,-1880.02,5309.8,-12.427,0,0,0,''),
+(19685,0,45,-1887.37,5315.43,-12.427,0,0,0,''),
+(19685,0,46,-1888.77,5324.52,-5.146,0,0,0,''),
+(19685,0,47,-1888.4,5334.15,0.151,0,0,0,''),
+(19685,0,48,-1890.22,5337.66,0.921,0,0,0,''),
+(19685,0,49,-1897.54,5323.04,1.256,0,0,0,''),
+(19685,0,50,-1900.25,5319.8,0.831,0,0,0,''),
+(19685,0,51,-1910.04,5291.26,1.288,0,0,0,''),
+(19685,0,52,-1916.781,5270.458,3.353774,100,2500,0,'pause'),
+(19685,0,53,-1927.23,5273.25,2.703,0,0,0,''),
+(19685,0,54,-1926.98,5278.47,0.109,0,0,0,''),
+(19685,0,55,-1927.67,5299.21,-12.427,0,0,0,''),
+(19685,0,56,-1922.84,5319.26,-12.427,0,0,0,''),
+(19685,0,57,-1925.78,5347.41,-12.427,0,0,0,''),
+(19685,0,58,-1954.91,5384.23,-12.427,0,0,0,''),
+(19685,0,59,-1966.73,5428.2,-12.427,0,0,0,''),
+(19685,0,60,-1979.48,5448.42,-12.427,0,0,0,''),
+(19685,0,61,-1977.53,5453.86,-12.385,0,0,0,''),
+(19685,0,62,-1968.06,5455.78,-4.343,0,0,0,''),
+(19685,0,63,-1959.22,5454.9,0.202,0,0,0,''),
+(19685,0,64,-1954.63,5457.01,0.9,0,0,0,''),
+(19685,0,65,-1957.061,5461.438,1.027785,100,2500,0,'pause'),
+(19685,0,66,-1952.87,5462.96,0.956,0,0,0,''),
+(19685,0,67,-1955.34,5467.12,0.445,0,0,0,''),
+(19685,0,68,-1962.03,5472.8,-4.243,0,0,0,''),
+(19685,0,69,-1968.01,5480.91,-12.427,0,0,0,''),
+(19685,0,70,-1945.9,5515.95,-12.427,0,0,0,''),
+(19685,0,71,-1874.87,5549.78,-12.427,0,0,0,''),
+(19685,0,72,-1840.64,5544.23,-12.427,0,0,0,''),
+(19685,0,73,-1838.96,5536.06,-5.639,0,0,0,''),
+(19685,0,74,-1839.58,5525.63,0.193,0,0,0,''),
+(19685,0,75,-1837.93,5521.12,0.844,0,0,0,''),
+(19685,0,76,-1832.781,5523.799,1.035073,100,2500,0,'pause'),
+(19685,0,77,-1847.987,5477.499,0.8568287,100,40000,0,'end'),
 (20129,0,1,-8374.93,-4250.21,-204.38,0,5000,0,''),
 (20129,0,2,-8374.93,-4250.21,-204.38,0,16000,0,''),
 (20129,0,3,-8374.93,-4250.21,-204.38,0,10000,0,''),
@@ -10204,20 +10214,20 @@ INSERT INTO script_waypoint VALUES
 (20281,0,26,3103.51,2784.36,116.857,0,0,0,''),
 (20281,0,27,3100,2796.67,118.118,0,0,0,''),
 (20281,0,28,3096.29,2801.03,118.096,0,0,0,'SAY_DRIJYA_COMPLETE'),
-(20415,0,1,2488.77,2184.89,104.64,0,0,0,''),
-(20415,0,2,2478.72,2184.77,98.58,0,0,0,''),
-(20415,0,3,2473.52,2184.71,99,0,0,0,''),
-(20415,0,4,2453.15,2184.96,97.09,0,4000,0,''),
-(20415,0,5,2424.18,2184.15,94.11,0,0,0,''),
-(20415,0,6,2413.18,2184.15,93.42,0,0,0,''),
-(20415,0,7,2402.02,2183.9,87.59,0,0,0,''),
-(20415,0,8,2333.31,2181.63,90.03,0,4000,0,''),
-(20415,0,9,2308.73,2184.34,92.04,0,0,0,''),
-(20415,0,10,2303.1,2196.89,94.94,0,0,0,''),
-(20415,0,11,2304.58,2272.23,96.67,0,0,0,''),
-(20415,0,12,2297.09,2271.4,95.16,0,0,0,''),
-(20415,0,13,2297.68,2266.79,95.07,0,4000,0,''),
-(20415,0,14,2297.67,2266.76,95.07,0,4000,0,''),
+(20415,0,1,2488.77,2184.89,104.64,100,0,0,''),
+(20415,0,2,2478.72,2184.77,98.58,100,0,0,''),
+(20415,0,3,2473.52,2184.71,99,100,0,0,''),
+(20415,0,4,2453.15,2184.96,97.09,100,4000,0,''),
+(20415,0,5,2424.18,2184.15,94.11,100,0,0,''),
+(20415,0,6,2413.18,2184.15,93.42,100,0,0,''),
+(20415,0,7,2402.02,2183.9,87.59,100,0,0,''),
+(20415,0,8,2333.31,2181.63,90.03,100,4000,0,''),
+(20415,0,9,2308.73,2184.34,92.04,100,0,0,''),
+(20415,0,10,2303.1,2196.89,94.94,100,0,0,''),
+(20415,0,11,2304.58,2272.23,96.67,100,0,0,''),
+(20415,0,12,2297.09,2271.4,95.16,100,0,0,''),
+(20415,0,13,2297.68,2266.79,95.07,100,4000,0,''),
+(20415,0,14,2297.67,2266.76,95.07,100,4000,0,''),
 (20763,0,1,4084.09,2297.25,110.277,0,0,0,''),
 (20763,0,2,4107.17,2294.92,106.625,0,0,0,''),
 (20763,0,3,4154.13,2296.79,102.331,0,0,0,''),
@@ -10291,7 +10301,7 @@ INSERT INTO script_waypoint VALUES
 (20985,0,38,3984.63,2077.76,256.405,0,0,0,''),
 (20985,0,39,3978.75,2066.79,256.405,0,0,0,''),
 (20985,0,40,3959.94,2039.18,257.63,0,0,0,''),
-(20985,0,41,3955.86,2030.96,257.812,4.133,0,0,''),
+(20985,0,41,3955.86,2030.96,257.812,4.133,60000,0,'Captain Saeed - Wait and Kill Dimensius the All-Devouring 19554'),
 (21027,0,1,-2638.89,1358.96,35.9607,0,0,0,''),
 (21027,0,2,-2652.62,1354.46,34.8615,0,0,0,''),
 (21027,0,3,-2670.7,1348.18,34.446,0,0,0,''),

@@ -500,7 +500,7 @@ void WorldState::BuffMagtheridonTeam(Team team)
         {
             if (team == ALLIANCE && player->GetTeam() == ALLIANCE)
             {
-                player->GetMap()->AddMessage([guid](Map* map) -> void
+                player->GetMap()->GetMessager().AddMessage([guid](Map* map) -> void
                 {
                     if (Player* player = map->GetPlayer(guid))
                         player->CastSpell(player, SPELL_TROLLBANES_COMMAND, TRIGGERED_OLD_TRIGGERED);
@@ -508,7 +508,7 @@ void WorldState::BuffMagtheridonTeam(Team team)
             }
             if (team == HORDE && player->GetTeam() == HORDE)
             {
-                player->GetMap()->AddMessage([guid](Map* map) -> void
+                player->GetMap()->GetMessager().AddMessage([guid](Map* map) -> void
                 {
                     if (Player* player = map->GetPlayer(guid))
                         player->CastSpell(player, SPELL_NAZGRELS_FAVOR, TRIGGERED_OLD_TRIGGERED);
@@ -526,7 +526,7 @@ void WorldState::DispelMagtheridonTeam(Team team)
         {
             if (team == ALLIANCE && player->GetTeam() == ALLIANCE)
             {
-                player->GetMap()->AddMessage([guid](Map* map) -> void
+                player->GetMap()->GetMessager().AddMessage([guid](Map* map) -> void
                 {
                     if (Player* player = map->GetPlayer(guid))
                         player->RemoveAurasDueToSpell(SPELL_TROLLBANES_COMMAND);
@@ -534,7 +534,7 @@ void WorldState::DispelMagtheridonTeam(Team team)
             }
             if (team == HORDE && player->GetTeam() == HORDE)
             {
-                player->GetMap()->AddMessage([guid](Map* map) -> void
+                player->GetMap()->GetMessager().AddMessage([guid](Map* map) -> void
                 {
                     if (Player* player = map->GetPlayer(guid))
                         player->RemoveAurasDueToSpell(SPELL_NAZGRELS_FAVOR);
@@ -647,7 +647,7 @@ void WorldState::BuffAdalsSongOfBattle()
     {
         if (Player* player = sObjectMgr.GetPlayer(guid))
         {
-            player->GetMap()->AddMessage([guid](Map* map) -> void
+            player->GetMap()->GetMessager().AddMessage([guid](Map* map) -> void
             {
                 if (Player* player = map->GetPlayer(guid))
                     player->CastSpell(player, SPELL_ADAL_SONG_OF_BATTLE, TRIGGERED_OLD_TRIGGERED);
@@ -662,7 +662,7 @@ void WorldState::DispelAdalsSongOfBattle()
     {
         if (Player* player = sObjectMgr.GetPlayer(guid))
         {
-            player->GetMap()->AddMessage([guid](Map* map) -> void
+            player->GetMap()->GetMessager().AddMessage([guid](Map* map) -> void
             {
                 if (Player* player = map->GetPlayer(guid))
                     player->RemoveAurasDueToSpell(SPELL_ADAL_SONG_OF_BATTLE);
@@ -945,7 +945,11 @@ bool WorldState::SetExpansion(uint8 expansion)
         sGameEventMgr.StartEvent(GAME_EVENT_ECHOES_OF_DOOM);
     else
         sGameEventMgr.StopEvent(GAME_EVENT_ECHOES_OF_DOOM);
-    sWorld.UpdateSessionExpansion(expansion);
+    sWorld.ExecuteForAllSessions([expansion](WorldSession& worldSession)
+    {
+        if (worldSession.GetSecurity() < SEC_GAMEMASTER)
+            worldSession.SetExpansion(expansion);
+    });
     Save(SAVE_ID_EXPANSION_RELEASE); // save to DB right away
     return true;
 }

@@ -46,6 +46,7 @@
 #include <mutex>
 #include <deque>
 #include <cstdarg>
+#include <iostream>
 
 #ifdef BUILD_PLAYERBOT
 #include "PlayerBot/Base/PlayerbotMgr.h"
@@ -243,6 +244,7 @@ void WorldSession::SendPacket(WorldPacket const& packet) const
 /// Add an incoming packet to the queue
 void WorldSession::QueuePacket(std::unique_ptr<WorldPacket> new_packet)
 {
+    sWorld.IncrementOpcodeCounter(new_packet->GetOpcode());
     std::lock_guard<std::mutex> guard(m_recvQueueLock);
     m_recvQueue.push_back(std::move(new_packet));
 }
@@ -268,14 +270,20 @@ void WorldSession::LogUnprocessedTail(WorldPacket& packet) const
 /// Update the WorldSession (triggered by World update)
 bool WorldSession::Update(PacketFilter& updater)
 {
-    std::lock_guard<std::mutex> guard(m_recvQueueLock);
+    GetMessager().Execute(this);
+
+    std::deque<std::unique_ptr<WorldPacket>> recvQueueCopy;
+    {
+        std::lock_guard<std::mutex> guard(m_recvQueueLock);
+        std::swap(recvQueueCopy, m_recvQueue);
+    }
 
     ///- Retrieve packets from the receive queue and call the appropriate handlers
     /// not process packets if socket already closed
-    while (m_Socket && !m_Socket->IsClosed() && !m_recvQueue.empty())
+    while (m_Socket && !m_Socket->IsClosed() && !recvQueueCopy.empty())
     {
-        auto const packet = std::move(m_recvQueue.front());
-        m_recvQueue.pop_front();
+        auto const packet = std::move(recvQueueCopy.front());
+        recvQueueCopy.pop_front();
 
         /*#if 1
         sLog.outError( "MOEP: %s (0x%.4X)",
@@ -614,8 +622,11 @@ void WorldSession::LogoutPlayer()
             group->UpdatePlayerOnlineStatus(_player, false);
 
         ///- Broadcast a logout message to the player's friends
-        sSocialMgr.SendFriendStatus(_player, FRIEND_OFFLINE, _player->GetObjectGuid(), true);
-        sSocialMgr.RemovePlayerSocial(_player->GetGUIDLow());
+        if (_player->GetSocial()) // might not yet be initialized
+        {
+            sSocialMgr.SendFriendStatus(_player, FRIEND_OFFLINE, _player->GetObjectGuid(), true);
+            sSocialMgr.RemovePlayerSocial(_player->GetGUIDLow());
+        }
 
         // GM ticket notification
         sTicketMgr.OnPlayerOnlineState(*_player, false);
@@ -684,8 +695,15 @@ void WorldSession::LogoutPlayer()
 }
 
 /// Kick a player out of the World
-void WorldSession::KickPlayer()
+void WorldSession::KickPlayer(bool save, bool inPlace)
 {
+    m_playerSave = save;
+    if (inPlace)
+    {
+        LogoutPlayer();
+        return;
+    }
+
 #ifdef BUILD_PLAYERBOT
     if (!_player)
         return;

@@ -210,7 +210,7 @@ bool Pet::LoadPetFromDB(Player* owner, uint32 petentry /*= 0*/, uint32 petnumber
 
     uint32 pet_number = fields[0].GetUInt32();
 
-    if (!forced && owner->IsPetNeedBeTemporaryUnsummoned())
+    if (!forced && owner->IsPetNeedBeTemporaryUnsummoned(nullptr))
     {
         // set temporary summon that way its possible if the player unmount to resummon it automaticaly
         owner->SetTemporaryUnsummonedPetNumber(pet_number);
@@ -583,25 +583,21 @@ Player* Pet::GetSpellModOwner() const
 void Pet::SetDeathState(DeathState s)                       // overwrite virtual Creature::SetDeathState and Unit::SetDeathState
 {
     Creature::SetDeathState(s);
-    if (GetDeathState() == CORPSE)
+    if (GetDeathState() == CORPSE) // will despawn at corpse despawning (Pet::Update code)
     {
-        // remove summoned pet (no corpse)
-        if (getPetType() == SUMMON_PET)
-            Unsummon(PET_SAVE_NOT_IN_SLOT);
-        // other will despawn at corpse desppawning (Pet::Update code)
-        else
-        {
-            // pet corpse non lootable and non skinnable
-            SetUInt32Value(UNIT_DYNAMIC_FLAGS, UNIT_DYNFLAG_NONE);
-            RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_SKINNABLE);
+        // pet corpse non lootable and non skinnable
+        SetUInt32Value(UNIT_DYNAMIC_FLAGS, UNIT_DYNFLAG_NONE);
+        RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_SKINNABLE);
 
+        if (getPetType() != SUMMON_PET)
+        {
             // lose happiness when died and not in BG/Arena
             MapEntry const* mapEntry = sMapStore.LookupEntry(GetMapId());
             if (!mapEntry || (mapEntry->map_type != MAP_ARENA && mapEntry->map_type != MAP_BATTLEGROUND))
                 ModifyPower(POWER_HAPPINESS, -HAPPINESS_LEVEL_SIZE);
-
-            SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_STUNNED);
         }
+
+        SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_STUNNED);
     }
     else if (GetDeathState() == ALIVE)
     {
@@ -1157,13 +1153,16 @@ void Pet::InitStatsForLevel(uint32 petlevel)
 
 void Pet::InitPetScalingAuras()
 {
+    if (getPetType() == HUNTER_PET)
+    {
+        CastSpell(nullptr, 34902, TRIGGERED_NONE);
+        CastSpell(nullptr, 34903, TRIGGERED_NONE);
+        CastSpell(nullptr, 34904, TRIGGERED_NONE);
+        return;
+    }
+
     switch (GetUInt32Value(UNIT_CREATED_BY_SPELL))
     {
-        case 13481: // Tame Beast - Hunter
-            CastSpell(nullptr, 34902, TRIGGERED_NONE);
-            CastSpell(nullptr, 34903, TRIGGERED_NONE);
-            CastSpell(nullptr, 34904, TRIGGERED_NONE);
-            break;
         case 688: // Imp - Warlock
         case 691: // Felhunter
         case 697: // Voidwalker
@@ -1555,7 +1554,7 @@ void Pet::_SaveAuras()
 
         // skip all holders from spells that are passive or channeled
         // do not save single target holders (unless they were cast by the player)
-        if (save && !holder->IsPassive() && !IsChanneledSpell(holder->GetSpellProto()) && (holder->GetCasterGuid() == GetObjectGuid() || holder->GetTrackedAuraType() == TRACK_AURA_TYPE_NOT_TRACKED))
+        if (save && holder->IsSaveToDbHolder())
         {
             int32  damage[MAX_EFFECT_INDEX];
             uint32 periodicTime[MAX_EFFECT_INDEX];
@@ -1569,7 +1568,7 @@ void Pet::_SaveAuras()
                 if (Aura* aur = holder->GetAuraByEffectIndex(SpellEffectIndex(i)))
                 {
                     // don't save not own area auras
-                    if (aur->IsAreaAura() && holder->GetCasterGuid() != GetObjectGuid())
+                    if (!aur->IsSaveToDbAura())
                         continue;
 
                     damage[i] = aur->GetModifier()->m_amount;
@@ -2178,6 +2177,9 @@ bool Pet::Create(uint32 guidlow, CreatureCreatePos& cPos, CreatureInfo const* ci
     if (getPetType() == MINI_PET)                           // always non-attackable
         SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
 
+    if (getPetType() == SUMMON_PET)
+        SetCorpseDelay(5);
+
     return true;
 }
 
@@ -2369,4 +2371,9 @@ void Pet::RegenerateHealth()
     }
 
     ModifyHealth(addvalue);
+}
+
+void Pet::ResetCorpseRespawn()
+{
+    m_corpseExpirationTime = GetMap()->GetCurrentClockTime() + std::chrono::milliseconds(1000); // rudimentary value - just need more than now
 }

@@ -711,17 +711,6 @@ bool ChatHandler::HandleDebugBattlegroundCommand(char* /*args*/)
     return true;
 }
 
-bool ChatHandler::HandleDebugBattlegroundStartCommand(char* /*args*/)
-{
-    if (auto bg = m_session->GetPlayer()->GetBattleGround())
-    {
-        bg->SetStartDelayTime(-1);
-        return true;
-    }
-
-    return false;
-}
-
 bool ChatHandler::HandleDebugArenaCommand(char* /*args*/)
 {
     sBattleGroundMgr.ToggleArenaTesting();
@@ -1233,35 +1222,6 @@ bool ChatHandler::HandleDebugTaxiCommand(char* /*args*/)
     Player* player = m_session->GetPlayer();
     player->ToggleTaxiDebug();
     PSendSysMessage(LANG_COMMAND_TAXI_DEBUG, (player->IsTaxiDebug() ? GetMangosString(LANG_ON) : GetMangosString(LANG_OFF)));
-    return true;
-}
-
-bool ChatHandler::HandleDebugMaps(char* /*args*/)
-{
-    PSendSysMessage("Update time statistics:");
-    PSendSysMessage("Map[0] >> Min: %ums, Max: %ums, Avg: %ums",
-        sMapMgr.GetMapUpdateMinTime(0), sMapMgr.GetMapUpdateMaxTime(0), sMapMgr.GetMapUpdateAvgTime(0));
-    PSendSysMessage("Map[1] >> Min: %ums, Max: %ums, Avg: %ums",
-        sMapMgr.GetMapUpdateMinTime(1), sMapMgr.GetMapUpdateMaxTime(1), sMapMgr.GetMapUpdateAvgTime(1));
-    PSendSysMessage("Map[530] >> Min: %ums, Max: %ums, Avg: %ums",
-        sMapMgr.GetMapUpdateMinTime(530), sMapMgr.GetMapUpdateMaxTime(530), sMapMgr.GetMapUpdateAvgTime(530));
-
-    if (m_session)
-    {
-        Player* player = m_session->GetPlayer();
-        if (!player)
-            return true;
-
-        if (player->GetMap()->IsContinent())
-            return true;
-
-        uint32 mapId = player->GetMap()->GetId();
-        uint32 instance = player->GetMap()->GetInstanceId();
-        PSendSysMessage("Instance update time statistics:");
-        PSendSysMessage("Map[%u] (Instance: %u) >> Min: %ums, Max: %ums, Avg: %ums",
-            mapId, instance, sMapMgr.GetMapUpdateMinTime(mapId, instance), sMapMgr.GetMapUpdateMaxTime(mapId, instance), sMapMgr.GetMapUpdateAvgTime(mapId, instance));
-    }
-
     return true;
 }
 

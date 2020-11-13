@@ -29,6 +29,7 @@
 #include "AuctionHouse/AuctionHouseMgr.h"
 #include "Entities/Item.h"
 #include "Server/WorldSocket.h"
+#include "Multithreading/Messager.h"
 
 #include <deque>
 #include <mutex>
@@ -348,7 +349,7 @@ class WorldSession
         }
 
         void LogoutPlayer();
-        void KickPlayer();
+        void KickPlayer(bool save = false, bool inPlace = false); // inplace variable needed for shutdown
 
         void QueuePacket(std::unique_ptr<WorldPacket> new_packet);
 
@@ -959,6 +960,8 @@ class WorldSession
 #endif
 
         std::deque<uint32> GetOpcodeHistory();
+
+        Messager<WorldSession>& GetMessager() { return m_messager; }
     private:
         // Additional private opcode handlers
         void HandleComplainMail(WorldPacket& recv_data);
@@ -1007,6 +1010,8 @@ class WorldSession
 
         std::mutex m_recvQueueLock;
         std::deque<std::unique_ptr<WorldPacket>> m_recvQueue;
+
+        Messager<WorldSession> m_messager;
 };
 #endif
 /// @}
