@@ -197,8 +197,8 @@ if (BUILD_AHBOT)
   install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/AuctionHouseBot/ahbot.conf.dist.in DESTINATION ${CONF_DIR} RENAME ahbot.conf.dist)
 endif()
 
-# Define Cmangos Bots BUILD_PLAYERBOT if need
-if (BUILD_PLAYERBOTS)
+# Define BUILD_PLAYERBOT if need
+if (BUILD_PLAYERBOT)
   add_definitions(-DBUILD_PLAYERBOT)
 endif()
 
