@@ -1611,9 +1611,9 @@ void World::Update(uint32 diff)
         auctionbot.Update();
         m_timers[WUPDATE_AHBOT].Reset();
     }
+#endif
     sRandomPlayerbotMgr.UpdateAI(diff);
     sRandomPlayerbotMgr.UpdateSessions(diff);
-#endif
 #endif
 
     /// <li> Handle session updates
