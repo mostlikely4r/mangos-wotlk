@@ -691,13 +691,19 @@ void AchievementMgr::SendAchievementEarned(AchievementEntry const* achievement) 
 
     if (achievement->flags & (ACHIEVEMENT_FLAG_REALM_FIRST_KILL | ACHIEVEMENT_FLAG_REALM_FIRST_REACH))
     {
+        uint32 team = GetPlayer()->GetTeam();
+
         // broadcast realm first reached
         WorldPacket data(SMSG_SERVER_FIRST_ACHIEVEMENT, strlen(GetPlayer()->GetName()) + 1 + 8 + 4 + 4);
         data << GetPlayer()->GetName();
         data << GetPlayer()->GetObjectGuid();
         data << uint32(achievement->ID);
-        data << uint32(0);                                  // 1=link supplied string as player name, 0=display plain string
-        sWorld.SendGlobalMessage(data);
+        std::size_t linkTypePos = data.wpos();
+        data << uint32(1);                                  // display name as clickable link in chat
+        sWorld.SendGlobalMessage(data, team);
+
+        data.put<uint32>(linkTypePos, 0);                   // display name as plain string in chat
+        sWorld.SendGlobalMessage(data, team == ALLIANCE ? HORDE : ALLIANCE);
     }
     // if player is in world he can tell his friends about new achievement
     else if (GetPlayer()->IsInWorld())
@@ -2867,7 +2873,7 @@ void AchievementGlobalMgr::LoadRewardLocales()
             std::string str = fields[2 + 2 * (i - 1)].GetCppString();
             if (!str.empty())
             {
-                int idx = sObjectMgr.GetOrNewIndexForLocale(LocaleConstant(i));
+                int idx = sObjectMgr.GetOrNewStorageLocaleIndexFor(LocaleConstant(i));
                 if (idx >= 0)
                 {
                     if (data.subject.size() <= size_t(idx))
@@ -2879,7 +2885,7 @@ void AchievementGlobalMgr::LoadRewardLocales()
             str = fields[2 + 2 * (i - 1) + 1].GetCppString();
             if (!str.empty())
             {
-                int idx = sObjectMgr.GetOrNewIndexForLocale(LocaleConstant(i));
+                int idx = sObjectMgr.GetOrNewStorageLocaleIndexFor(LocaleConstant(i));
                 if (idx >= 0)
                 {
                     if (data.text.size() <= size_t(idx))

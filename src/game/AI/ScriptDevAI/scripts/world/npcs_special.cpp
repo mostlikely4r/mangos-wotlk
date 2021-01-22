@@ -2031,7 +2031,7 @@ struct npc_nether_rayAI : public CombatAI
     npc_nether_rayAI(Creature* creature) : CombatAI(creature, RAY_ACTION_MAX)
     {
         AddCombatAction(RAY_ACTION_DRAIN_MANA, 2000u);
-        AddCombatAction(RAY_ACTION_TAIL_STING, 2000u);
+        AddCombatAction(RAY_ACTION_TAIL_STING, 9000, 11000);
         AddCombatAction(RAY_ACTION_NETHER_SHOCK, 0u);
     }
 
@@ -2040,7 +2040,7 @@ struct npc_nether_rayAI : public CombatAI
         switch (id)
         {
             case RAY_ACTION_DRAIN_MANA: return urand(10000, 15000);
-            case RAY_ACTION_TAIL_STING: return 23000;
+            case RAY_ACTION_TAIL_STING: return urand(16000, 17000);
             case RAY_ACTION_NETHER_SHOCK: return 5000;
             default: return 0;
         }
@@ -2077,18 +2077,11 @@ struct npc_nether_rayAI : public CombatAI
                 DoCastSpellIfCan(m_creature->GetVictim(), SPELL_TAIL_STING);
                 return;
             case RAY_ACTION_NETHER_SHOCK:
-                if (!m_creature->GetVictim())
-                    return;
                 DoCastSpellIfCan(m_creature->GetVictim(), SPELL_NETHER_SHOCK);
                 return;
         }
     }
 };
-
-UnitAI* GetAI_npc_nether_ray(Creature* creature)
-{
-    return new npc_nether_rayAI(creature);
-}
 
 /*######
 ## npc_mage_mirror_image
@@ -2354,9 +2347,17 @@ enum
     NPC_PHOENIX_MGT                     = 24674,
 };
 
-struct mob_phoenix_tkAI : public ScriptedAI
+enum PhoenixActions
 {
-    mob_phoenix_tkAI(Creature* creature) : ScriptedAI(creature)
+    PHOENIX_ACTION_MAX,
+    PHOENIX_EMBER_BLAST,
+    PHOENIX_REBIRTH,
+    PHOENIX_ATTACK_DELAY,
+};
+
+struct mob_phoenix_tkAI : public CombatAI
+{
+    mob_phoenix_tkAI(Creature* creature) : CombatAI(creature, PHOENIX_ACTION_MAX)
     {
         bool tk = m_creature->GetEntry() == NPC_PHOENIX_TK;
         if (tk)
@@ -2376,7 +2377,10 @@ struct mob_phoenix_tkAI : public ScriptedAI
             m_phoenixEggSpellId = SPELL_PHOENIX_EGG_MGT;
         }
         SetDeathPrevention(true);
-        Reset();
+        SetReactState(REACT_PASSIVE);
+        AddCustomAction(PHOENIX_EMBER_BLAST, true, [&]() { HandleEmberBlast(); });
+        AddCustomAction(PHOENIX_REBIRTH, true, [&]() { HandleRebirth(); });
+        AddCustomAction(PHOENIX_ATTACK_DELAY, 2000u, [&]() { HandleAttackDelay(); });
     }
 
     uint32 m_burnSpellId;
@@ -2385,19 +2389,11 @@ struct mob_phoenix_tkAI : public ScriptedAI
     uint32 m_rebirthRespawnSpellId;
     uint32 m_phoenixEggSpellId;
 
-    uint32 m_emberDelayTimer;
-    uint32 m_phoenixRebirthTimer;
     ObjectGuid m_eggGuid;
-
-    void Reset() override
-    {
-        m_emberDelayTimer = 0;
-        m_phoenixRebirthTimer = 0;
-    }
 
     void Aggro(Unit* /*pWho*/) override
     {
-        DoCastSpellIfCan(nullptr, m_burnSpellId);
+        DoCastSpellIfCan(nullptr, m_burnSpellId, CAST_TRIGGERED);
     }
 
     void JustPreventedDeath(Unit* /*attacker*/) override
@@ -2421,12 +2417,12 @@ struct mob_phoenix_tkAI : public ScriptedAI
         SetMeleeEnabled(false);
         SetCombatScriptStatus(true);
 
-        m_emberDelayTimer = 1000;
+        ResetTimer(PHOENIX_EMBER_BLAST, 1000);
     }
 
     void JustRespawned() override
     {
-        DoCastSpellIfCan(nullptr, m_rebirthSpawnSpellId);
+        // DoCastSpellIfCan(nullptr, m_rebirthSpawnSpellId);
     }
 
     void JustSummoned(Creature* summoned) override
@@ -2450,7 +2446,7 @@ struct mob_phoenix_tkAI : public ScriptedAI
         }
     }
 
-    void SpellHit(Unit* /*caster*/, const SpellEntry* spellInfo) override
+    void OnSpellCooldownAdded(SpellEntry const* spellInfo) override
     {
         if (spellInfo->Id == m_rebirthRespawnSpellId)
         {
@@ -2478,47 +2474,31 @@ struct mob_phoenix_tkAI : public ScriptedAI
                 egg->ForcedDespawn();
     }
 
-    void UpdateAI(const uint32 diff) override
+    void HandleAttackDelay()
     {
-        if (m_emberDelayTimer)
-        {
-            if (m_emberDelayTimer <= diff)
-            {
-                m_emberDelayTimer = 0;
-                // Spawn egg and make invisible
-                DoCastSpellIfCan(nullptr, m_emberBlastSpellId, CAST_TRIGGERED);
-                DoCastSpellIfCan(nullptr, m_phoenixEggSpellId, CAST_TRIGGERED);
-                m_phoenixRebirthTimer = m_creature->GetEntry() == NPC_PHOENIX_TK ? 15000 : 10000;
-            }
-            else
-                m_emberDelayTimer -= diff;
-        }
-
-        if (m_phoenixRebirthTimer)
-        {
-            if (m_phoenixRebirthTimer <= diff)
-            {
-                m_phoenixRebirthTimer = 0;
-                if (Creature* egg = m_creature->GetMap()->GetCreature(m_eggGuid))
-                    egg->ForcedDespawn();
-
-                DoRebirth();
-            }
-            else
-                m_phoenixRebirthTimer -= diff;
-        }
-
-        if (!m_creature->SelectHostileTarget() || !m_creature->GetVictim())
-            return;
-
-        DoMeleeAttackIfReady();
+        SetReactState(REACT_AGGRESSIVE);
+        m_creature->SetInCombatWithZone();
+        AttackClosestEnemy();
     }
-};
 
-UnitAI* GetAI_mob_phoenix_tk(Creature* pCreature)
-{
-    return new mob_phoenix_tkAI(pCreature);
-}
+    void HandleEmberBlast()
+    {
+        // Spawn egg and make invisible
+        DoCastSpellIfCan(nullptr, m_emberBlastSpellId, CAST_TRIGGERED);
+        DoCastSpellIfCan(nullptr, m_phoenixEggSpellId, CAST_TRIGGERED);
+        ResetTimer(PHOENIX_REBIRTH, m_creature->GetEntry() == NPC_PHOENIX_TK ? 15000 : 10000);
+    }
+
+    void HandleRebirth()
+    {
+        if (Creature* egg = m_creature->GetMap()->GetCreature(m_eggGuid))
+            egg->ForcedDespawn();
+
+        DoRebirth();
+    }
+
+    void ExecuteAction(uint32 action) override { }
+};
 
 void AddSC_npcs_special()
 {
@@ -2602,7 +2582,7 @@ void AddSC_npcs_special()
 
     pNewScript = new Script;
     pNewScript->Name = "npc_nether_ray";
-    pNewScript->GetAI = &GetAI_npc_nether_ray;
+    pNewScript->GetAI = &GetNewAIInstance<npc_nether_rayAI>;
     pNewScript->RegisterSelf();
 
     pNewScript = new Script;
@@ -2627,6 +2607,6 @@ void AddSC_npcs_special()
 
     pNewScript = new Script;
     pNewScript->Name = "mob_phoenix";
-    pNewScript->GetAI = &GetAI_mob_phoenix_tk;
+    pNewScript->GetAI = &GetNewAIInstance<mob_phoenix_tkAI>;
     pNewScript->RegisterSelf();
 }

@@ -55,7 +55,9 @@ class BattleGround;
 class GridMap;
 class GameObjectModel;
 class WeatherSystem;
+class GenericTransport;
 namespace MaNGOS { struct ObjectUpdater; }
+class Transport;
 
 // GCC have alternative #pragma pack(N) syntax and old gcc version not support pack(push,N), also any gcc version not support it at some platform
 #if defined( __GNUC__ )
@@ -160,6 +162,8 @@ class Map : public GridRefManager<NGridType>
 
         void PlayerRelocation(Player*, float x, float y, float z, float orientation);
         void CreatureRelocation(Creature* creature, float x, float y, float z, float ang);
+        void GameObjectRelocation(GameObject* go, float x, float y, float z, float orientation, bool respawnRelocationOnFail = true);
+        void DynamicObjectRelocation(DynamicObject* dynObj, float x, float y, float z, float orientation);
 
         template<class T, class CONTAINER> void Visit(const Cell& cell, TypeContainerVisitor<T, CONTAINER>& visitor);
 
@@ -211,11 +215,13 @@ class Map : public GridRefManager<NGridType>
         uint32 GetMaxResetDelay() const;                    // dependent from map difficulty
         MapDifficultyEntry const* GetMapDifficulty() const; // dependent from map difficulty
 
+        MapEntry const* GetEntry() const { return i_mapEntry; }
         bool Instanceable() const { return i_mapEntry && i_mapEntry->Instanceable(); }
         bool IsDungeon() const { return i_mapEntry && i_mapEntry->IsDungeon(); }
         bool IsRaid() const { return i_mapEntry && i_mapEntry->IsRaid(); }
         bool IsNonRaidDungeon() const { return i_mapEntry && i_mapEntry->IsNonRaidDungeon(); }
         bool IsRaidOrHeroicDungeon() const { return IsRaid() || GetDifficulty() > DUNGEON_DIFFICULTY_NORMAL; }
+        bool IsHeroic() const { return IsRaid() ? i_spawnMode >= RAID_DIFFICULTY_10MAN_HEROIC : i_spawnMode >= DUNGEON_DIFFICULTY_HEROIC; }
         bool IsBattleGround() const { return i_mapEntry && i_mapEntry->IsBattleGround(); }
         bool IsBattleArena() const { return i_mapEntry && i_mapEntry->IsBattleArena(); }
         bool IsBattleGroundOrArena() const { return i_mapEntry && i_mapEntry->IsBattleGroundOrArena(); }
@@ -307,7 +313,7 @@ class Map : public GridRefManager<NGridType>
         void PlayDirectSoundToMap(uint32 soundId, uint32 zoneId = 0) const;
 
         // Dynamic VMaps
-        float GetHeight(uint32 phasemask, float x, float y, float z) const;
+        float GetHeight(uint32 phasemask, float x, float y, float z, bool swim = false) const;
         bool GetHeightInRange(uint32 phasemask, float x, float y, float& z, float maxSearchDist = 4.0f) const;
         bool IsInLineOfSight(float srcX, float srcY, float srcZ, float destX, float destY, float destZ, uint32 phasemask, bool ignoreM2Model) const;
         bool GetHitPosition(float srcX, float srcY, float srcZ, float& destX, float& destY, float& destZ, uint32 phasemask, float modifyDist) const;
@@ -357,6 +363,13 @@ class Map : public GridRefManager<NGridType>
 
         Messager<Map>& GetMessager() { return m_messager; }
 
+        GenericTransport* GetTransport(ObjectGuid guid);
+
+        void AddTransport(Transport* transport);
+        void RemoveTransport(Transport* transport);
+
+        bool CanSpawn(TypeID typeId, uint32 dbGuid);
+
     private:
         void LoadMapAndVMap(int gx, int gy);
 
@@ -366,6 +379,7 @@ class Map : public GridRefManager<NGridType>
 
         void SendInitTransports(Player* player) const;
         void SendRemoveTransports(Player* player) const;
+        void LoadTransports();
 
         void SendZoneDynamicInfo(Player* player) const;
 
@@ -439,6 +453,7 @@ class Map : public GridRefManager<NGridType>
         // Map local low guid counters
         ObjectGuidGenerator<HIGHGUID_UNIT> m_CreatureGuids;
         ObjectGuidGenerator<HIGHGUID_GAMEOBJECT> m_GameObjectGuids;
+        ObjectGuidGenerator<HIGHGUID_TRANSPORT> m_transportGuids;
         ObjectGuidGenerator<HIGHGUID_DYNAMICOBJECT> m_DynObjectGuids;
         ObjectGuidGenerator<HIGHGUID_PET> m_PetGuids;
         ObjectGuidGenerator<HIGHGUID_VEHICLE> m_VehicleGuids;
@@ -457,6 +472,11 @@ class Map : public GridRefManager<NGridType>
 
         // WeatherSystem
         WeatherSystem* m_weatherSystem;
+
+        // Transports
+        typedef std::set<Transport*> TransportSet;
+        TransportSet m_transports;
+        TransportSet::iterator m_transportsIterator;
 
         std::unordered_map<uint32, std::set<ObjectGuid>> m_spawnedCount;
 
@@ -493,6 +513,7 @@ class DungeonMap : public Map
         void SetResetSchedule(bool on);
 
         Team GetInstanceTeam() { return m_team; };
+        void SetInstanceTeam( Team team ) { m_team = team; }
 
         // can't be nullptr for loaded map
         DungeonPersistentState* GetPersistanceState() const;

@@ -810,7 +810,7 @@ void WorldSession::HandlePetCastSpellOpcode(WorldPacket& recvPacket)
     recvPacket >> targets.ReadForCaster(petUnit);
 
     // some spell cast packet including more data (for projectiles)
-    targets.ReadAdditionalSpellData(recvPacket, cast_flags);
+    HandleClientCastFlags(recvPacket, cast_flags, targets);
 
     petUnit->clearUnitState(UNIT_STAT_MOVING);
 
@@ -875,4 +875,14 @@ void WorldSession::HandleLearnPreviewTalentsPet(WorldPacket& recv_data)
     }
 
     _player->SendTalentsInfoData(true);
+}
+
+void WorldSession::HandleDismissCritter(WorldPacket& recv_data)
+{
+    ObjectGuid critterGuid;
+    recv_data >> critterGuid;
+
+    if (Pet* pet = _player->GetMiniPet())
+        if (pet->GetObjectGuid() == critterGuid)
+            pet->Unsummon(PET_SAVE_AS_DELETED, _player);
 }

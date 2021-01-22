@@ -42,11 +42,11 @@ uint32 PlayerAI::LookupHighestLearnedRank(uint32 spellId)
         else
             break;
     }
-    while (higherRank = sSpellMgr.GetNextSpellInChain(ownedRank));
+    while ((higherRank = sSpellMgr.GetNextSpellInChain(ownedRank)));
     return ownedRank;
 }
 
-void PlayerAI::AddPlayerSpellAction(uint32 priority, uint32 spellId, std::function<Unit*()> selector)
+void PlayerAI::AddPlayerSpellAction(uint32 /*priority*/, uint32 spellId, std::function<Unit*()> selector)
 {
     m_playerSpellActions.emplace_back(spellId, (selector ? selector : [&]()->Unit* { return m_player->GetVictim(); }));
 }
@@ -96,8 +96,10 @@ void PlayerAI::AttackClosestEnemy()
     });
 }
 
-void PlayerAI::UpdateAI(const uint32 /*diff*/)
+void PlayerAI::UpdateAI(const uint32 diff)
 {
+    UpdateTimers(diff);
+
     // Check if we have a current target
     if (!m_player->SelectHostileTarget() || !m_player->GetVictim())
         return;

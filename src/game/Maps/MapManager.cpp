@@ -44,9 +44,6 @@ MapManager::~MapManager()
     for (auto& i_map : i_maps)
         delete i_map.second;
 
-    for (auto m_Transport : m_Transports)
-        delete m_Transport;
-
     DeleteStateMachine();
 }
 
@@ -206,9 +203,6 @@ void MapManager::Update(uint32 diff)
     if (m_updater.activated())
         m_updater.wait();
 
-    for (Transport* m_Transport : m_Transports)
-        m_Transport->Update((uint32)i_timer.GetCurrent());
-
     // remove all maps which can be unloaded
     MapMapType::iterator iter = i_maps.begin();
     while (iter != i_maps.end())
@@ -320,7 +314,7 @@ Map* MapManager::CreateInstance(uint32 id, Player* player)
         map = FindMap(id, NewInstanceId);
         // it is possible that the save exists but the map doesn't
         if (!map)
-            pNewMap = CreateDungeonMap(id, NewInstanceId, pSave->GetDifficulty(), pSave);
+            pNewMap = CreateDungeonMap(id, NewInstanceId, pSave->GetDifficulty(), pSave, player->GetTeam());
     }
     else
     {
@@ -329,7 +323,7 @@ Map* MapManager::CreateInstance(uint32 id, Player* player)
         NewInstanceId = sObjectMgr.GenerateInstanceLowGuid();
 
         Difficulty diff = player->GetGroup() ? player->GetGroup()->GetDifficulty(entry->IsRaid()) : player->GetDifficulty(entry->IsRaid());
-        pNewMap = CreateDungeonMap(id, NewInstanceId, diff);
+        pNewMap = CreateDungeonMap(id, NewInstanceId, diff, nullptr, player->GetTeam());
     }
 
     // add a new map object into the registry
@@ -342,7 +336,7 @@ Map* MapManager::CreateInstance(uint32 id, Player* player)
     return map;
 }
 
-DungeonMap* MapManager::CreateDungeonMap(uint32 id, uint32 InstanceId, Difficulty difficulty, DungeonPersistentState* save)
+DungeonMap* MapManager::CreateDungeonMap(uint32 id, uint32 InstanceId, Difficulty difficulty, DungeonPersistentState* save, Team ownerTeam)
 {
     // make sure we have a valid map id
     if (!sMapStore.LookupEntry(id))
@@ -363,6 +357,9 @@ DungeonMap* MapManager::CreateDungeonMap(uint32 id, uint32 InstanceId, Difficult
     DEBUG_LOG("MapInstanced::CreateDungeonMap: %s map instance %d for %d created with difficulty %d", save ? "" : "new ", InstanceId, id, difficulty);
 
     DungeonMap* map = new DungeonMap(id, i_gridCleanUpDelay, InstanceId, difficulty);
+
+    // Set owner team before initializing
+    map->SetInstanceTeam(ownerTeam);
 
     // Dungeons can have saved instance data
     bool load_data = save != nullptr;

@@ -98,7 +98,7 @@ void instance_shattered_halls::SetData(uint32 uiType, uint32 uiData)
             if (uiData == DONE)
             {
                 DoUseDoorOrButton(GO_NETHEKURSE_DOOR);
-                DoUseDoorOrButton(GO_NETHEKURSE_ENTER_DOOR);
+                DoUseOpenableObject(GO_NETHEKURSE_ENTER_DOOR, true);
             }
             break;
         case TYPE_OMROGG:
@@ -295,7 +295,7 @@ InstanceData* GetInstanceData_instance_shattered_halls(Map* pMap)
 
 bool AreaTrigger_at_shattered_halls(Player* pPlayer, AreaTriggerEntry const* /*pAt*/)
 {
-    if (pPlayer->isGameMaster() || !pPlayer->IsAlive())
+    if (pPlayer->IsGameMaster() || !pPlayer->IsAlive())
         return false;
 
     instance_shattered_halls* pInstance = (instance_shattered_halls*)pPlayer->GetInstanceData();

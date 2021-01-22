@@ -17,21 +17,24 @@
 /* ScriptData
 SDName: Ebon_Hold
 SD%Complete: 95
-SDComment: Quest support: 12641, 12687, 12698, 12733, 12739(and 12742 to 12750), 12754, 12801, 12848
+SDComment: Quest support: 12619, 12641, 12687, 12698, 12733, 12739(and 12742 to 12750), 12754, 12801
 SDCategory: Ebon Hold
 EndScriptData */
 
 /* ContentData
 npc_a_special_surprise
 npc_death_knight_initiate
-npc_unworthy_initiate_anchor
-npc_unworthy_initiate
-go_acherus_soul_prison
 npc_eye_of_acherus
 npc_scarlet_ghoul
 npc_highlord_darion_mograine
 npc_fellow_death_knight
 npc_scarlet_courier
+spell_emblazon_runeblade
+spell_death_knight_initiate_visual
+spell_siphon_of_acherus
+spell_recall_eye_of_acherus
+spell_summon_ghouls_scarlet_crusade
+go_plague_cauldron
 EndContentData */
 
 #include "AI/ScriptDevAI/include/sc_common.h"
@@ -39,6 +42,8 @@ EndContentData */
 #include "world_map_ebon_hold.h"
 #include "AI/ScriptDevAI/base/pet_ai.h"
 #include "Entities/TemporarySpawn.h"
+#include "Spells/Scripts/SpellScript.h"
+#include "Spells/SpellAuras.h"
 
 /*######
 ## npc_a_special_surprise
@@ -599,6 +604,10 @@ struct npc_death_knight_initiateAI : public ScriptedAI
 
     void DamageTaken(Unit* /*pDoneBy*/, uint32& uiDamage, DamageEffectType /*damagetype*/, SpellEntry const* spellInfo) override
     {
+        // no damage check unless in duel with a player
+        if (m_duelerGuid.IsEmpty())
+            return;
+
         if (uiDamage >= m_creature->GetHealth())
         {
             uiDamage = 0;
@@ -753,277 +762,16 @@ bool EffectDummyCreature_npc_death_knight_initiate(Unit* pCaster, uint32 uiSpell
 }
 
 /*######
-## npc_unworthy_initiate_anchor
-######*/
-
-enum
-{
-    SAY_START                       = -1609000,             // 8 texts in total, GetTextId() generates random with this as base
-    SAY_AGGRO                       = -1609008,             // 8 texts in total, GetTextId() generates random with this as base
-
-    // SPELL_CHAINED_PESANT_LH         = 54602,             // not used. possible it determine side, where to go get "weapon"
-    // SPELL_CHAINED_PESANT_RH         = 54610,
-    SPELL_CHAINED_PESANT_CHEST      = 54612,
-    SPELL_CHAINED_PESANT_BREATH     = 54613,
-    SPELL_INITIATE_VISUAL           = 51519,
-
-    NPC_ANCHOR                      = 29521,
-    FACTION_MONSTER                 = 16,
-
-    PHASE_INACTIVE_OR_COMBAT        = 0,
-    PHASE_DRESSUP                   = 1,
-    PHASE_ACTIVATE                  = 2
-};
-
-struct npc_unworthy_initiate_anchorAI : public ScriptedAI
-{
-    npc_unworthy_initiate_anchorAI(Creature* pCreature) : ScriptedAI(pCreature) { Reset(); }
-
-    ObjectGuid m_myInitiateGuid;
-    ObjectGuid m_myPrisonGuid;
-
-    void Reset() override {}
-
-    void NotifyMe(Unit* pSource, GameObject* pGo)
-    {
-        m_myPrisonGuid = pGo->GetObjectGuid();
-        Creature* pInitiate = m_creature->GetMap()->GetCreature(m_myInitiateGuid);
-
-        if (pInitiate && pSource)
-        {
-            pInitiate->SetLootRecipient(pSource);
-            m_creature->InterruptNonMeleeSpells(false);
-            m_creature->CastSpell(pInitiate, SPELL_CHAINED_PESANT_BREATH, TRIGGERED_NONE);
-        }
-    }
-
-    void RegisterCloseInitiate(Creature* pCreature)
-    {
-        m_myInitiateGuid = pCreature->GetObjectGuid();
-    }
-
-    void ResetPrison()
-    {
-        if (GameObject* pPrison = m_creature->GetMap()->GetGameObject(m_myPrisonGuid))
-            pPrison->ResetDoorOrButton();
-    }
-};
-
-UnitAI* GetAI_npc_unworthy_initiate_anchor(Creature* pCreature)
-{
-    return new npc_unworthy_initiate_anchorAI(pCreature);
-}
-
-/*######
-## npc_unworthy_initiate
-######*/
-
-struct npc_unworthy_initiateAI : public ScriptedAI
-{
-    npc_unworthy_initiateAI(Creature* pCreature) : ScriptedAI(pCreature)
-    {
-        Reset();
-    }
-
-    ObjectGuid m_myAnchorGuid;
-    uint32 m_uiAnchorCheckTimer;
-    uint32 m_uiPhase;
-    uint32 m_uiPhaseTimer;
-    uint32 m_uiBloodStrike_Timer;
-    uint32 m_uiDeathCoil_Timer;
-    uint32 m_uiIcyTouch_Timer;
-    uint32 m_uiPlagueStrike_Timer;
-
-    void Reset() override
-    {
-        m_uiAnchorCheckTimer = 5000;
-        m_uiPhase = PHASE_INACTIVE_OR_COMBAT;
-        m_uiPhaseTimer = 7500;
-        m_uiBloodStrike_Timer = 4000;
-        m_uiDeathCoil_Timer = 6000;
-        m_uiIcyTouch_Timer = 2000;
-        m_uiPlagueStrike_Timer = 5000;
-
-        m_creature->SetImmuneToPlayer(true);
-    }
-
-    void JustReachedHome() override
-    {
-        SetAnchor();
-
-        if (Creature* pAnchor = GetAnchor())
-        {
-            if (npc_unworthy_initiate_anchorAI* pAnchorAI = dynamic_cast<npc_unworthy_initiate_anchorAI*>(pAnchor->AI()))
-                pAnchorAI->ResetPrison();
-        }
-    }
-
-    void JustRespawned() override
-    {
-        if (Creature* pAnchor = GetAnchor())
-        {
-            if (npc_unworthy_initiate_anchorAI* pAnchorAI = dynamic_cast<npc_unworthy_initiate_anchorAI*>(pAnchor->AI()))
-                pAnchorAI->ResetPrison();
-        }
-
-        Reset();
-    }
-
-    int32 GetTextId() const
-    {
-        return m_uiPhase == PHASE_DRESSUP ? SAY_START - urand(0, 7) : SAY_AGGRO - urand(0, 7);
-    }
-
-    Creature* GetAnchor() const
-    {
-        if (m_myAnchorGuid)
-            return m_creature->GetMap()->GetCreature(m_myAnchorGuid);
-        return GetClosestCreatureWithEntry(m_creature, NPC_ANCHOR, INTERACTION_DISTANCE * 2);
-    }
-
-    void SetAnchor()
-    {
-        if (Creature* pAnchor = GetAnchor())
-        {
-            if (npc_unworthy_initiate_anchorAI* pAnchorAI = dynamic_cast<npc_unworthy_initiate_anchorAI*>(pAnchor->AI()))
-                pAnchorAI->RegisterCloseInitiate(m_creature);
-
-            pAnchor->CastSpell(m_creature, SPELL_CHAINED_PESANT_CHEST, TRIGGERED_NONE);
-            m_myAnchorGuid = pAnchor->GetObjectGuid();
-
-            m_uiAnchorCheckTimer = 0;
-            return;
-        }
-
-        m_uiAnchorCheckTimer = 5000;
-    }
-
-    void SpellHit(Unit* pCaster, const SpellEntry* pSpell) override
-    {
-        if (pSpell->Id == SPELL_CHAINED_PESANT_BREATH)
-        {
-            pCaster->InterruptNonMeleeSpells(true);
-            m_creature->SetStandState(UNIT_STAND_STATE_STAND);
-
-            m_uiPhase = PHASE_DRESSUP;
-
-            if (Player* pSource = m_creature->GetLootRecipient())
-                DoScriptText(GetTextId(), m_creature, pSource);
-        }
-    }
-
-    void UpdateAI(const uint32 uiDiff) override
-    {
-        if (m_uiAnchorCheckTimer)
-        {
-            if (m_uiAnchorCheckTimer <= uiDiff)
-                SetAnchor();
-            else
-                m_uiAnchorCheckTimer -= uiDiff;
-        }
-
-        if (m_uiPhase == PHASE_INACTIVE_OR_COMBAT)
-        {
-            if (!m_creature->SelectHostileTarget() || !m_creature->GetVictim())
-                return;
-
-            if (m_uiBloodStrike_Timer < uiDiff)
-            {
-                DoCastSpellIfCan(m_creature->GetVictim(), SPELL_BLOOD_STRIKE);
-                m_uiBloodStrike_Timer = 9000;
-            }
-            else
-                m_uiBloodStrike_Timer -= uiDiff;
-
-            if (m_uiDeathCoil_Timer < uiDiff)
-            {
-                DoCastSpellIfCan(m_creature->GetVictim(), SPELL_DEATH_COIL);
-                m_uiDeathCoil_Timer = 8000;
-            }
-            else
-                m_uiDeathCoil_Timer -= uiDiff;
-
-            if (m_uiIcyTouch_Timer < uiDiff)
-            {
-                DoCastSpellIfCan(m_creature->GetVictim(), SPELL_ICY_TOUCH);
-                m_uiIcyTouch_Timer = 8000;
-            }
-            else
-                m_uiIcyTouch_Timer -= uiDiff;
-
-            if (m_uiPlagueStrike_Timer < uiDiff)
-            {
-                DoCastSpellIfCan(m_creature->GetVictim(), SPELL_PLAGUE_STRIKE);
-                m_uiPlagueStrike_Timer = 8000;
-            }
-            else
-                m_uiPlagueStrike_Timer -= uiDiff;
-
-            DoMeleeAttackIfReady();
-        }
-        else
-        {
-            if (m_uiPhaseTimer < uiDiff)
-            {
-                if (m_uiPhase == PHASE_DRESSUP)
-                {
-                    // ToDo: send the creature to the left / right in order to grab a weapon
-                    m_creature->CastSpell(m_creature, SPELL_INITIATE_VISUAL, TRIGGERED_NONE);
-
-                    m_uiPhase = PHASE_ACTIVATE;
-                }
-                else
-                {
-                    m_creature->SetFactionTemporary(FACTION_MONSTER, TEMPFACTION_RESTORE_COMBAT_STOP | TEMPFACTION_RESTORE_RESPAWN);
-
-                    m_uiPhase = PHASE_INACTIVE_OR_COMBAT;
-
-                    if (Player* pTarget = m_creature->GetLootRecipient())
-                    {
-                        DoScriptText(GetTextId(), m_creature, pTarget);
-                        m_creature->SetImmuneToPlayer(false);
-                        AttackStart(pTarget);
-                    }
-                }
-
-                m_uiPhaseTimer = 5000;
-            }
-            else
-                m_uiPhaseTimer -= uiDiff;
-        }
-    }
-};
-
-UnitAI* GetAI_npc_unworthy_initiate(Creature* pCreature)
-{
-    return new npc_unworthy_initiateAI(pCreature);
-}
-
-/*######
-## go_acherus_soul_prison
-######*/
-
-bool GOUse_go_acherus_soul_prison(Player* pPlayer, GameObject* pGo)
-{
-    if (Creature* pAnchor = GetClosestCreatureWithEntry(pGo, NPC_ANCHOR, INTERACTION_DISTANCE))
-    {
-        if (npc_unworthy_initiate_anchorAI* pAnchorAI = dynamic_cast<npc_unworthy_initiate_anchorAI*>(pAnchor->AI()))
-            pAnchorAI->NotifyMe(pPlayer, pGo);
-    }
-
-    return false;
-}
-
-/*######
 ## npc_eye_of_acherus
 ######*/
 
 enum
 {
-    SPELL_EYE_CONTROL       = 51852,                        // player control aura
-    SPELL_EYE_VISUAL        = 51892,
-    SPELL_EYE_FLIGHT        = 51890,                        // player flight control
-    SPELL_EYE_FLIGHT_BOOST  = 51923,                        // flight boost to reach new avalon
+    // SPELL_EYE_CONTROL    = 51852,                        // apply phase aura: 2; summon creature 28511 and apply player control aura
+    SPELL_EYE_VISUAL        = 51892,                        // apply visual aura
+    SPELL_EYE_FLIGHT        = 51890,                        // apply fly aura and change mounted speed; cast by the eye of acherus
+    SPELL_EYE_FLIGHT_BOOST  = 51923,                        // apply fly aura and increase speed aura
+    SPELL_RECALL_EYE        = 52694,
 
     EMOTE_DESTIANTION       = -1609089,
     EMOTE_CONTROL           = -1609090,
@@ -1042,23 +790,26 @@ struct npc_eye_of_acherusAI : public ScriptedAI
 {
     npc_eye_of_acherusAI(Creature* pCreature) : ScriptedAI(pCreature)
     {
+        m_creature->SetDisplayId(26320);                // HACK remove when correct modelid will be taken by core
+
         m_isFinished = false;
         m_reachPoint = false;
-        m_timer = START_POINT_PAUSE_TIME;
+        m_flightTimer = START_POINT_PAUSE_TIME;
         m_phase = 0;
         Reset();
     }
 
     bool m_isFinished;
     bool m_reachPoint;
-    uint32 m_timer;
+    uint32 m_flightTimer;
     uint32 m_phase;
 
     void Reset() override {}
 
     void JustDied(Unit* /*pKiller*/) override
     {
-        m_creature->CastSpell(m_creature, 52694, TRIGGERED_OLD_TRIGGERED);     // HACK - Remove this when mangos supports proper spell casting
+        // recall the eye when it dies - need to remove phase and control aura from player
+        DoCastSpellIfCan(m_creature, SPELL_RECALL_EYE, CAST_TRIGGERED);
     }
 
     void MovementInform(uint32 uiType, uint32 uiPointId) override
@@ -1072,22 +823,8 @@ struct npc_eye_of_acherusAI : public ScriptedAI
             case POINT_EYE_DESTINATION:
                 m_reachPoint = true;
                 break;
-
-            default:
-                return;
         }
     }
-
-    void SummonedCreatureDespawn(Creature* pCreature) override
-    {
-        if (Unit* unit = pCreature->GetCharmer())
-        {
-            // this aura is applied to the master instead to the creature
-            unit->RemoveAurasDueToSpell(SPELL_EYE_FLIGHT_BOOST);
-        }
-    }
-
-    void AttackStart(Unit* /*pWho*/) override {}
 
     void UpdateAI(const uint32 uiDiff) override
     {
@@ -1096,67 +833,64 @@ struct npc_eye_of_acherusAI : public ScriptedAI
 
         switch (m_phase)
         {
-            case 0: // initialization > move to start position
+            case 0:         // initialization and move to start position
+            {
                 if (m_creature->GetBeneficiaryPlayer())
                 {
-                    m_creature->SetPhaseMask(2, true);              // HACK remove when summon spells and auras are implemented properly in mangos
-                    m_creature->SetDisplayId(26320);                // HACK remove when correct modelid will be taken by core
-
-                    DoCastSpellIfCan(m_creature, SPELL_EYE_VISUAL, CAST_TRIGGERED);
-                    m_creature->GetMotionMaster()->MovePoint(POINT_EYE_DESTINATION, aEyeStartPos[0], aEyeStartPos[1], aEyeStartPos[2]);
+                    if (DoCastSpellIfCan(m_creature, SPELL_EYE_VISUAL) == CAST_OK)
+                        m_creature->GetMotionMaster()->MovePoint(POINT_EYE_DESTINATION, aEyeStartPos[0], aEyeStartPos[1], aEyeStartPos[2]);
                 }
                 else
                 {
+                    // Failsafe: creature isn't controlled -> despawn
                     m_creature->ForcedDespawn();
                     m_isFinished = true;
                 }
+
                 ++m_phase;
                 break;
-
-            case 1: // wait start position reached then wait 5 sec before the journey to the end point
+            }
+            case 1:         // wait for start position reached, then wait 5 sec before the journey to the end point
+            {
                 if (!m_reachPoint)
                     return;
 
-                if (m_timer < uiDiff)
+                if (m_flightTimer < uiDiff)
                 {
-                    Player* player = m_creature->GetBeneficiaryPlayer();
-                    if (!player)
-                        return;
+                    // Apply flight aura and start moving to position
+                    if (DoCastSpellIfCan(m_creature, SPELL_EYE_FLIGHT_BOOST) == CAST_OK)
+                    {
+                        if (Player* player = m_creature->GetBeneficiaryPlayer())
+                            DoScriptText(EMOTE_DESTIANTION, m_creature, player);
 
-                    // Update Speed for Eye
-                    DoScriptText(EMOTE_DESTIANTION, m_creature, player);
-                    DoCastSpellIfCan(m_creature, SPELL_EYE_FLIGHT_BOOST, CAST_FORCE_TARGET_SELF);
-                    ++m_phase;
+                        // move to the destination position
+                        Position tgtPos = Position(aEyeDestination[0], aEyeDestination[1], aEyeDestination[2], 0);
+                        m_creature->GetMotionMaster()->MovePoint(POINT_EYE_DESTINATION, tgtPos, FORCED_MOVEMENT_NONE, m_creature->GetSpawner()->GetSpeed(MOVE_RUN));
+
+                        m_reachPoint = false;
+                        ++m_phase;
+                    }
                 }
                 else
-                    m_timer -= uiDiff;
-                break;
+                    m_flightTimer -= uiDiff;
 
-            case 2: // go to the end point
-                m_creature->GetMotionMaster()->MovePoint(POINT_EYE_DESTINATION, aEyeDestination[0], aEyeDestination[1], aEyeDestination[2]);
-                m_reachPoint = false;
-                ++m_phase;
                 break;
-
-            case 3: // wait to reach end point then set fly mode by applying SPELL_EYE_FLIGHT
+            }
+            case 2:         // wait to reach end point then set fly mode by applying SPELL_EYE_FLIGHT
+            {
                 if (!m_reachPoint)
                     return;
 
-                if (Player* pPlayer = m_creature->GetBeneficiaryPlayer())
-                    DoScriptText(EMOTE_CONTROL, m_creature, pPlayer);
-
-                if (m_creature->m_movementInfo.HasMovementFlag(MOVEFLAG_LEVITATING))
-                    m_creature->SetLevitate(false);             // HACK to remove levitating flag and thus permit fly.
-
-                if (Unit* unit = m_creature->GetCharmer())
+                if (DoCastSpellIfCan(m_creature, SPELL_EYE_FLIGHT) == CAST_OK)
                 {
-                    // this aura is applied to the master instead to the creature
-                    unit->RemoveAurasDueToSpell(SPELL_EYE_FLIGHT_BOOST);
-                }
-                DoCastSpellIfCan(m_creature, SPELL_EYE_FLIGHT, CAST_TRIGGERED);
-                ++m_phase;
-                break;
+                    if (Player* pPlayer = m_creature->GetBeneficiaryPlayer())
+                        DoScriptText(EMOTE_CONTROL, m_creature, pPlayer);
 
+                    m_isFinished = true;
+                    ++m_phase;
+                }
+                break;
+            }
             default:
                 m_isFinished = true;
                 break;
@@ -1180,37 +914,40 @@ enum
     SAY_GHUL_SPAWN_3            = -1609093,
     SAY_GHUL_SPAWN_4            = -1609094,
     SAY_GHUL_SPAWN_5            = -1609095,
-    SAY_GOTHIK_THROW_IN_PIT     = -1609096,                 // TODO: Unclear if there exist more texts
+    SAY_GOTHIK_THROW_IN_PIT_1   = -1609096,
+    SAY_GOTHIK_THROW_IN_PIT_2   = -1609097,
 
-    SPELL_GHOUL_SUMMONED        = 52500,
-    SPELL_GOTHIK_GHOUL_PING     = 52514,
-    SPELL_QUEST_CREDIT          = 52517,
-    SPELL_GHOUL_UNSUMMON        = 52555,
+    SPELL_GHOUL_SUMMONED        = 52500,                    // dummy aura applied on owner player
+    SPELL_GOTHIK_GHOUL_PING     = 52514,                    // aoe ping cast by Gothik using spell 52513; targets creature 28845
+    SPELL_GHOUL_CREDIT          = 52517,                    // kill credit id: 28845
+    SPELL_GHOULPLOSION          = 52519,                    // cast by Gothik on the Scarlet Ghoul before destroying the creature; triggers 52555 from ghoul target to ghoul master
 
     NPC_GOTHIK                  = 28658,
 };
 
-static const float aPitPosition[3] = {2380.13f, -5783.06f, 151.367f};
+static const float aPitPosition[3] = { 2369.276f, -5778.689f, 151.367f};
 
 struct npc_scarlet_ghoulAI : public ScriptedPetAI
 {
     npc_scarlet_ghoulAI(Creature* pCreature) : ScriptedPetAI(pCreature)
     {
-        m_bGotHit = false;
-        m_bIsJumping = false;
-        m_bDidInitText = false;
-        m_uiUnsummonTimer = 0;
-        DoCastSpellIfCan(m_creature, SPELL_GHOUL_SUMMONED);
+        // apply aura on the player master
+        if (DoCastSpellIfCan(m_creature, SPELL_GHOUL_SUMMONED) == CAST_OK)
+        {
+            m_bGotHit       = false;
+            m_bIsJumping    = false;
+            m_bDidInitText  = false;
 
-        SetReactState(REACT_DEFENSIVE);
-
+            SetReactState(REACT_DEFENSIVE);
+        }
         Reset();
     }
+
+    ObjectGuid m_gothikGuid;
 
     bool m_bGotHit;
     bool m_bIsJumping;
     bool m_bDidInitText;
-    uint32 m_uiUnsummonTimer;
 
     void Reset() override {}
 
@@ -1218,15 +955,40 @@ struct npc_scarlet_ghoulAI : public ScriptedPetAI
     {
         if (uiMotionType == EFFECT_MOTION_TYPE && uiPointId == 1)
         {
-            m_uiUnsummonTimer = 1000;
-            DoCastSpellIfCan(m_creature, SPELL_GHOUL_UNSUMMON);
-            m_creature->GetMotionMaster()->MoveIdle();
+            // make Gothik despawn the ghoul; notification to player follows in spell chain
+            if (Creature* pGothik = m_creature->GetMap()->GetCreature(m_gothikGuid))
+                pGothik->CastSpell(m_creature, SPELL_GHOULPLOSION, TRIGGERED_OLD_TRIGGERED);
         }
     }
 
-    void JustDied(Unit* /*pKiller*/) override
+    void ReceiveAIEvent(AIEventType eventType, Unit* /*pSender*/, Unit* pInvoker, uint32 /*uiMiscValue*/) override
     {
-        DoCastSpellIfCan(m_creature, SPELL_GHOUL_UNSUMMON, CAST_TRIGGERED);
+        if (eventType == AI_EVENT_CUSTOM_A)
+        {
+            // first spell hit - apply kill credit
+            if (!m_bGotHit)
+            {
+                if (DoCastSpellIfCan(m_creature, SPELL_GHOUL_CREDIT) == CAST_OK)
+                    m_bGotHit = true;
+            }
+            // following spell hit - jump and despawn
+            else
+            {
+                m_gothikGuid = pInvoker->GetObjectGuid();
+
+                // make caster yell if possible
+                world_map_ebon_hold* pInstance = static_cast<world_map_ebon_hold*>(m_creature->GetInstanceData());
+                if (pInstance && pInstance->CanAndToggleGothikYell())
+                    DoScriptText(urand(0, 1) ? SAY_GOTHIK_THROW_IN_PIT_1 : SAY_GOTHIK_THROW_IN_PIT_2, pInvoker);
+
+                // jump to the pit
+                float fX, fY, fZ;
+                m_creature->GetRandomPoint(aPitPosition[0], aPitPosition[1], aPitPosition[2], 10.0f, fX, fY, fZ);
+                m_creature->GetMotionMaster()->MoveJump(fX, fY, fZ, 24.21229f, 6.0f, 1);
+
+                m_bIsJumping = true;
+            }
+        }
     }
 
     void UpdateAI(const uint32 uiDiff) override
@@ -1237,18 +999,6 @@ struct npc_scarlet_ghoulAI : public ScriptedPetAI
             DoScriptText(SAY_GHUL_SPAWN_1 - urand(0, 4), m_creature, pOwner);
 
             m_bDidInitText = true;
-        }
-
-        if (m_uiUnsummonTimer)
-        {
-            if (m_uiUnsummonTimer <= uiDiff)
-            {
-                m_creature->Suicide();
-                if (m_creature->IsPet())
-                    ((Pet*)m_creature)->Unsummon(PET_SAVE_AS_DELETED);
-                return;
-            }
-            m_uiUnsummonTimer -= uiDiff;
         }
 
         if (m_bIsJumping)
@@ -1262,25 +1012,8 @@ bool EffectDummyCreature_npc_scarlet_ghoul(Unit* pCaster, uint32 uiSpellId, Spel
 {
     if (uiSpellId == SPELL_GOTHIK_GHOUL_PING && uiEffIndex == EFFECT_INDEX_0)
     {
-        if (npc_scarlet_ghoulAI* pGhoulAi = dynamic_cast<npc_scarlet_ghoulAI*>(pCreatureTarget->AI()))
-        {
-            if (!pGhoulAi->m_bGotHit)                       // First hit
-            {
-                pCreatureTarget->CastSpell(pCreatureTarget, 52517, TRIGGERED_NONE);
-                pGhoulAi->m_bGotHit = true;
-            }
-            else                                            // Second hit
-            {
-                world_map_ebon_hold* pInstance = static_cast<world_map_ebon_hold*>(pCreatureTarget->GetInstanceData());
-                if (pCaster && pInstance && pInstance->CanAndToggleGothikYell())
-                    DoScriptText(SAY_GOTHIK_THROW_IN_PIT, pCaster);
-
-                float fX, fY, fZ;
-                pCreatureTarget->GetRandomPoint(aPitPosition[0], aPitPosition[1], aPitPosition[2], 10.0f, fX, fY, fZ);
-                pGhoulAi->m_bIsJumping = true;
-                pCreatureTarget->GetMotionMaster()->MoveJump(fX, fY, fZ, 24.21229f, 6.0f, 1);
-            }
-        }
+        // inform creature AI that was hit by spell
+        pCaster->AI()->SendAIEvent(AI_EVENT_CUSTOM_A, pCaster, pCreatureTarget);
         return true;
     }
 
@@ -2900,6 +2633,290 @@ UnitAI* GetAI_npc_scarlet_courier(Creature* pCreature)
     return new npc_scarlet_courierAI(pCreature);
 }
 
+/*######
+## spell_emblazon_runeblade - 51770
+######*/
+
+struct spell_emblazon_runeblade : public SpellScript
+{
+    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const override
+    {
+        if (effIdx != EFFECT_INDEX_0)
+            return;
+
+        Unit* caster = spell->GetAffectiveCaster();
+        if (!caster)
+            return;
+
+        uint32 uiSpell = spell->m_spellInfo->CalculateSimpleValue(effIdx);
+
+        caster->CastSpell(caster, uiSpell, TRIGGERED_NONE);
+    }
+};
+
+/*######
+## spell_emblazon_runeblade_aura - 51769
+######*/
+
+struct spell_emblazon_runeblade_aura : public AuraScript
+{
+    void OnPeriodicTrigger(Aura* aura, PeriodicTriggerData& data) const override
+    {
+        // override target; the real caster of the triggered spell is the player
+        data.caster = aura->GetCaster();
+        data.target = nullptr;
+    }
+};
+
+/*######
+## spell_death_knight_initiate_visual - 51519
+######*/
+
+struct spell_death_knight_initiate_visual : public SpellScript
+{
+    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const override
+    {
+        if (effIdx != EFFECT_INDEX_0)
+            return;
+
+        Unit* unitTarget = spell->GetUnitTarget();
+        if (!unitTarget)
+            return;
+
+        uint32 spellId;
+
+        bool isMale = unitTarget->getGender() == GENDER_MALE;
+        switch (unitTarget->getRace())
+        {
+            case RACE_HUMAN:    spellId = isMale ? 51520 : 51534; break;
+            case RACE_DWARF:    spellId = isMale ? 51538 : 51537; break;
+            case RACE_NIGHTELF: spellId = isMale ? 51535 : 51536; break;
+            case RACE_GNOME:    spellId = isMale ? 51539 : 51540; break;
+            case RACE_DRAENEI:  spellId = isMale ? 51541 : 51542; break;
+            case RACE_ORC:      spellId = isMale ? 51543 : 51544; break;
+            case RACE_UNDEAD:   spellId = isMale ? 51549 : 51550; break;
+            case RACE_TAUREN:   spellId = isMale ? 51547 : 51548; break;
+            case RACE_TROLL:    spellId = isMale ? 51546 : 51545; break;
+            case RACE_BLOODELF: spellId = isMale ? 51551 : 51552; break;
+            default:
+                return;
+        }
+
+        unitTarget->CastSpell(unitTarget, spellId, TRIGGERED_OLD_TRIGGERED);
+    }
+};
+
+/*######
+## spell_siphon_of_acherus_aura - 51859
+######*/
+
+struct spell_siphon_of_acherus_aura : public AuraScript
+{
+    void OnPeriodicTrigger(Aura* aura, PeriodicTriggerData& data) const override
+    {
+        // override target; the real caster of the triggered spell is the player
+        data.caster = aura->GetCaster();
+        data.target = nullptr;
+    }
+};
+
+/*######
+## spell_siphon_of_acherus - 51858
+######*/
+
+struct spell_siphon_of_acherus : public SpellScript
+{
+    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const override
+    {
+        if (effIdx != EFFECT_INDEX_0)
+            return;
+
+        Unit* caster = spell->GetAffectiveCaster();
+        Unit* target = spell->GetUnitTarget();
+        if (!caster || !target)
+            return;
+
+        uint32 spellId;
+
+        switch (target->GetEntry())
+        {
+            case 28525: spellId = 51973; break;     // New Avalon Forge
+            case 28542: spellId = 51979; break;     // Scarlet Hold
+            case 28543: spellId = 51976; break;     // New Avalon Town Hall
+            case 28544: spellId = 51981; break;     // Chapel of the Crimson Flame
+            default:
+                return;
+        }
+
+        target->CastSpell(caster, spellId, TRIGGERED_NONE);
+    }
+};
+
+/*######
+## spell_siphon_of_acherus_credit - 51973, 51976, 51979, 51981
+######*/
+
+struct spell_siphon_of_acherus_credit : public SpellScript
+{
+    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const override
+    {
+        if (effIdx != EFFECT_INDEX_0)
+            return;
+
+        Unit* target = spell->GetUnitTarget();
+        if (!target)
+            return;
+
+        uint32 triggerSpellId;
+
+        switch (spell->m_spellInfo->Id)
+        {
+            case 51973: triggerSpellId = 51974; break;  // New Avalon Forge
+            case 51979: triggerSpellId = 51980; break;  // Scarlet Hold
+            case 51976: triggerSpellId = 51977; break;  // New Avalon Town Hall
+            case 51981: triggerSpellId = 51982; break;  // Chapel of the Crimson Flame
+            default:
+                return;
+        }
+
+        target->CastSpell(target, triggerSpellId, TRIGGERED_NONE);
+    }
+};
+
+/*######
+## spell_recall_eye_of_acherus - 52694
+######*/
+
+struct spell_recall_eye_of_acherus : public SpellScript
+{
+    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const override
+    {
+        if (effIdx != EFFECT_INDEX_0)
+            return;
+
+        Unit* caster = spell->GetAffectiveCaster();
+        if (!caster)
+            return;
+
+        Unit* charmer = caster->GetCharmer();
+        if (!charmer || charmer->GetTypeId() != TYPEID_PLAYER)
+            return;
+
+        charmer->RemoveAurasDueToSpell(51852);
+        charmer->RemoveAurasDueToSpell(51923);
+    }
+};
+
+/*######
+## spell_summon_ghouls_scarlet_crusade - 51904
+######*/
+
+struct spell_summon_ghouls_scarlet_crusade : public SpellScript
+{
+    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const override
+    {
+        if (effIdx != EFFECT_INDEX_0)
+            return;
+
+        Unit* target = spell->GetUnitTarget();
+        if (!target)
+            return;
+
+        // cast Summon Ghouls On Scarlet Crusade
+        target->CastSpell(target, 51900, TRIGGERED_OLD_TRIGGERED);
+    }
+};
+
+/*######
+## spell_ghoulplosion - 52519
+######*/
+
+struct spell_ghoulplosion : public SpellScript
+{
+    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const override
+    {
+        // action handled by effect 2; effect 0 is for visual
+        if (effIdx != EFFECT_INDEX_2)
+            return;
+
+        Unit* target = spell->GetUnitTarget();
+        if (!target)
+            return;
+
+        // cast Dispel Scarlet Ghoul Credit Counter on ghoul owner
+        target->CastSpell(target, 52555, TRIGGERED_OLD_TRIGGERED);
+    }
+};
+
+/*######
+## spell_dispel_scarlet_ghoul_credit - 52555
+######*/
+
+struct spell_dispel_scarlet_ghoul_credit : public SpellScript
+{
+    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const override
+    {
+        if (effIdx != EFFECT_INDEX_0)
+            return;
+
+        Unit* caster = spell->GetCaster();
+        Unit* target = spell->GetUnitTarget();
+        if (!target || !caster || !caster->IsCreature())
+            return;
+
+        uint32 spellId = spell->m_spellInfo->CalculateSimpleValue(effIdx);
+
+        // remove ghoul counter aura - 52500
+        target->RemoveAurasByCasterSpell(spellId, caster->GetObjectGuid());
+
+        // unsummon pet
+        Creature* ghoul = static_cast<Creature*>(caster);
+        if (ghoul->IsPet())
+            (static_cast<Pet*>(caster))->Unsummon(PET_SAVE_AS_DELETED);
+    }
+};
+
+/*######
+## spell_gift_of_the_harvester - 52479
+######*/
+
+struct spell_gift_of_the_harvester : public SpellScript
+{
+    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const override
+    {
+        if (effIdx != EFFECT_INDEX_0)
+            return;
+
+        Unit* caster = spell->GetCaster();
+        Unit* target = spell->GetUnitTarget();
+        if (!target || !caster || !caster->IsPlayer())
+            return;
+
+        // summon ghoul using spell 52490
+        uint32 spellId = spell->m_spellInfo->CalculateSimpleValue(effIdx);
+
+        // Each ghoul casts 52500 onto player, so use number of auras as check
+        Unit::SpellAuraHolderConstBounds bounds = caster->GetSpellAuraHolderBounds(52500);
+        uint32 summonedGhouls = std::distance(bounds.first, bounds.second);
+
+        // randomly summon a ghoul pet (creature id 28845) or a hostile ghost (creature id 28846)
+        caster->CastSpell(target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), urand(0, 2) || summonedGhouls >= 5 ? 52505 : spellId, TRIGGERED_OLD_TRIGGERED);
+    }
+};
+
+/*######
+## go_plague_cauldron
+######*/
+
+struct go_plague_cauldron : public GameObjectAI
+{
+    go_plague_cauldron(GameObject* go) : GameObjectAI(go)
+    {
+        go->GetVisibilityData().SetInvisibilityMask(10, true);
+        go->GetVisibilityData().AddInvisibilityValue(10, 1000);
+    }
+};
+
 void AddSC_ebon_hold()
 {
     Script* pNewScript = new Script;
@@ -2913,21 +2930,6 @@ void AddSC_ebon_hold()
     pNewScript->pGossipHello = &GossipHello_npc_death_knight_initiate;
     pNewScript->pGossipSelect = &GossipSelect_npc_death_knight_initiate;
     pNewScript->pEffectDummyNPC = &EffectDummyCreature_npc_death_knight_initiate;
-    pNewScript->RegisterSelf();
-
-    pNewScript = new Script;
-    pNewScript->Name = "npc_unworthy_initiate";
-    pNewScript->GetAI = &GetAI_npc_unworthy_initiate;
-    pNewScript->RegisterSelf();
-
-    pNewScript = new Script;
-    pNewScript->Name = "npc_unworthy_initiate_anchor";
-    pNewScript->GetAI = &GetAI_npc_unworthy_initiate_anchor;
-    pNewScript->RegisterSelf();
-
-    pNewScript = new Script;
-    pNewScript->Name = "go_acherus_soul_prison";
-    pNewScript->pGOUse = &GOUse_go_acherus_soul_prison;
     pNewScript->RegisterSelf();
 
     pNewScript = new Script;
@@ -2962,4 +2964,21 @@ void AddSC_ebon_hold()
     pNewScript->Name = "npc_scarlet_courier";
     pNewScript->GetAI = &GetAI_npc_scarlet_courier;
     pNewScript->RegisterSelf();
+
+    pNewScript = new Script;
+    pNewScript->Name = "go_plague_cauldron";
+    pNewScript->GetGameObjectAI = &GetNewAIInstance<go_plague_cauldron>;
+    pNewScript->RegisterSelf();
+
+    RegisterSpellScript<spell_emblazon_runeblade>("spell_emblazon_runeblade");
+    RegisterAuraScript<spell_emblazon_runeblade_aura>("spell_emblazon_runeblade_aura");
+    RegisterSpellScript<spell_death_knight_initiate_visual>("spell_death_knight_initiate_visual");
+    RegisterAuraScript<spell_siphon_of_acherus_aura>("spell_siphon_of_acherus_aura");
+    RegisterSpellScript<spell_siphon_of_acherus>("spell_siphon_of_acherus");
+    RegisterSpellScript<spell_siphon_of_acherus_credit>("spell_siphon_of_acherus_credit");
+    RegisterSpellScript<spell_recall_eye_of_acherus>("spell_recall_eye_of_acherus");
+    RegisterSpellScript<spell_summon_ghouls_scarlet_crusade>("spell_summon_ghouls_scarlet_crusade");
+    RegisterSpellScript<spell_ghoulplosion>("spell_ghoulplosion");
+    RegisterSpellScript<spell_dispel_scarlet_ghoul_credit>("spell_dispel_scarlet_ghoul_credit");
+    RegisterSpellScript<spell_gift_of_the_harvester>("spell_gift_of_the_harvester");
 }

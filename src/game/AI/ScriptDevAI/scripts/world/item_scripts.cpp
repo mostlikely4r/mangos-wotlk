@@ -231,7 +231,7 @@ struct GDRChannel : public SpellScript
 
 struct GDRPeriodicDamage : public AuraScript
 {
-    int32 OnAuraValueCalculate(Aura* /*aura*/, Unit* /*caster*/, int32 value) const override
+    int32 OnAuraValueCalculate(Aura* /*aura*/, Unit* /*caster*/, int32 /*value*/) const override
     {
         return urand(100, 500);
     }
@@ -243,6 +243,20 @@ struct GDRPeriodicDamage : public AuraScript
             int32 dmg = (int32)aura->GetScriptValue();
             aura->GetTarget()->CastCustomSpell(aura->GetTarget()->GetTarget(), SPELL_GDR_DAMAGE_HIT, &dmg, nullptr, nullptr, TRIGGERED_OLD_TRIGGERED);
         }
+    }
+};
+
+struct OgrilaFlasks : public AuraScript
+{
+    void OnApply(Aura* aura, bool apply) const override
+    {
+        if (aura->GetEffIndex() != EFFECT_INDEX_0 || apply)
+            return;
+
+        SpellEntry const* spellInfo = aura->GetSpellProto();
+        for (uint32 i = EFFECT_INDEX_1; i < MAX_EFFECT_INDEX; ++i)
+            if (uint32 triggerSpell = spellInfo->EffectTriggerSpell[i])
+                aura->GetTarget()->RemoveAurasDueToSpell(triggerSpell);
     }
 };
 
@@ -279,4 +293,5 @@ void AddSC_item_scripts()
 
     RegisterSpellScript<GDRChannel>("spell_gdr_channel");
     RegisterAuraScript<GDRPeriodicDamage>("spell_gdr_periodic");
+    RegisterAuraScript<OgrilaFlasks>("spell_ogrila_flasks");
 }

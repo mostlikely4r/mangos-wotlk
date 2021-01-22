@@ -131,7 +131,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
     else
     {
         // send in universal language if player in .gmon mode (ignore spell effects)
-        if (_player->isGameMaster())
+        if (_player->IsGameMaster())
             lang = LANG_UNIVERSAL;
         else
         {
@@ -411,7 +411,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
             if (group->isBattleGroup())
                 group = _player->GetOriginalGroup();
 
-            if (!group->isRaidGroup())
+            if (!group || !group->isRaidGroup())
                 return;
 
 #ifdef ENABLE_PLAYERBOTS
@@ -455,7 +455,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
             if (group->isBattleGroup())
                 group = _player->GetOriginalGroup();
 
-            if (!group->isRaidGroup() || !group->IsLeader(_player->GetObjectGuid()))
+            if (!group || !group->isRaidGroup() || !group->IsLeader(_player->GetObjectGuid()))
                 return;
 
 #ifdef ENABLE_PLAYERBOTS

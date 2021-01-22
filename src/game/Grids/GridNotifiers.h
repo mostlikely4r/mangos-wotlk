@@ -28,6 +28,7 @@
 #include "Entities/Player.h"
 #include "Entities/Unit.h"
 
+#include <functional>
 #include <memory>
 
 namespace MaNGOS
@@ -109,6 +110,18 @@ namespace MaNGOS
         ObjectMessageDistDeliverer(WorldObject const& obj, WorldPacket const& msg, float dist) : i_object(obj), i_message(msg), i_dist(dist) {}
         void Visit(CameraMapType& m);
         template<class SKIP> void Visit(GridRefManager<SKIP>&) {}
+    };
+
+    struct SpellMessageDestLocDeliverer
+    {
+        WorldObject const& i_object;
+        WorldPacket const& i_message;
+        bool i_accumulate;
+        GuidSet i_guids;
+        SpellMessageDestLocDeliverer(WorldObject const& obj, WorldPacket const& msg) : i_object(obj), i_message(msg), i_accumulate(true) {}
+        void Visit(CameraMapType& m);
+        template<class SKIP> void Visit(GridRefManager<SKIP>&) {}
+        void StopAccumulating() { i_accumulate = false; }
     };
 
     struct ObjectUpdater

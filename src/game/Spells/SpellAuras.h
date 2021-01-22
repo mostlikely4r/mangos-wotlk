@@ -439,6 +439,7 @@ class Aura
         void HandleTriggerLinkedAura(bool apply, bool Real);
         void HandleAuraDetaunt(bool Apply, bool Real);
         void HandleOverrideClassScript(bool apply, bool real);
+        void HandleAuraAllowOnlyAbility(bool apply, bool real);
 
         virtual ~Aura();
 
@@ -524,7 +525,8 @@ class Aura
         int32 OnAuraValueCalculate(Unit* caster, int32 currentValue);
         void OnDamageCalculate(int32& advertisedBenefit, float& totalMod);
         void OnApply(bool apply);
-        bool OnCheckProc();
+        void OnAfterApply(bool apply);
+        bool OnCheckProc(ProcExecutionData& data);
         SpellAuraProcResult OnProc(ProcExecutionData& data);
         void OnAbsorb(int32& currentAbsorb, uint32& reflectedSpellId, int32& reflectDamage, bool& preventedDeath);
         void OnManaAbsorb(int32& currentAbsorb);

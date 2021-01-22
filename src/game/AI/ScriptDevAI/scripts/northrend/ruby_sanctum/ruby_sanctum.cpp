@@ -58,8 +58,15 @@ void instance_ruby_sanctum::OnPlayerEnter(Player* /*pPlayer*/)
     if (GetSingleCreatureFromStorage(NPC_HALION_REAL, true))
         return;
 
+    // spawn both real and twilight versions
     if (Creature* pSummoner = GetSingleCreatureFromStorage(NPC_HALION_CONTROLLER))
-        pSummoner->SummonCreature(NPC_HALION_REAL, pSummoner->GetPositionX(), pSummoner->GetPositionY(), pSummoner->GetPositionZ(), 3.159f, TEMPSPAWN_DEAD_DESPAWN, 0);
+    {
+        if (Creature* pHalion = pSummoner->SummonCreature(NPC_HALION_REAL, pSummoner->GetPositionX(), pSummoner->GetPositionY(), pSummoner->GetPositionZ(), 3.159f, TEMPSPAWN_DEAD_DESPAWN, 0))
+            pHalion->SetPhaseMask(1, true);
+
+        if (Creature* pHalion = pSummoner->SummonCreature(NPC_HALION_TWILIGHT, pSummoner->GetPositionX(), pSummoner->GetPositionY(), pSummoner->GetPositionZ(), 3.159f, TEMPSPAWN_DEAD_DESPAWN, 0))
+            pHalion->SetPhaseMask(32, true);
+    }
 }
 
 void instance_ruby_sanctum::OnCreatureCreate(Creature* pCreature)
@@ -80,6 +87,10 @@ void instance_ruby_sanctum::OnCreatureCreate(Creature* pCreature)
         case NPC_HALION_REAL:
         case NPC_HALION_TWILIGHT:
         case NPC_HALION_CONTROLLER:
+        case NPC_SHADOW_ORB_1:
+        case NPC_SHADOW_ORB_2:
+        case NPC_SHADOW_ORB_3:
+        case NPC_SHADOW_ORB_4:
             m_npcEntryGuidStore[pCreature->GetEntry()] = pCreature->GetObjectGuid();
             break;
         case NPC_ZARITHRIAN_SPAWN_STALKER:
@@ -101,6 +112,7 @@ void instance_ruby_sanctum::OnObjectCreate(GameObject* pGo)
                 pGo->SetGoState(GO_STATE_ACTIVE);
             break;
         case GO_FLAME_RING:
+        case GO_TWILIGHT_FLAME_RING:
             break;
         case GO_BURNING_TREE_1:
         case GO_BURNING_TREE_2:
@@ -110,13 +122,40 @@ void instance_ruby_sanctum::OnObjectCreate(GameObject* pGo)
                 pGo->SetGoState(GO_STATE_ACTIVE);
             break;
         case GO_TWILIGHT_PORTAL_ENTER_1:
+            break;
         case GO_TWILIGHT_PORTAL_ENTER_2:
         case GO_TWILIGHT_PORTAL_LEAVE:
-            break;
+            m_lTwilightPortalsGuidList.push_back(pGo->GetObjectGuid());
+            return;
         default:
             return;
     }
     m_goEntryGuidStore[pGo->GetEntry()] = pGo->GetObjectGuid();
+}
+
+void instance_ruby_sanctum::OnCreatureRespawn(Creature* pCreature)
+{
+    switch (pCreature->GetEntry())
+    {
+        // following creatures have a passive behavior
+        case NPC_COMBUSTION:
+        case NPC_CONSUMPTION:
+        case NPC_SHADOW_ORB_1:
+        case NPC_SHADOW_ORB_2:
+        case NPC_SHADOW_ORB_3:
+        case NPC_SHADOW_ORB_4:
+        case NPC_ORB_CARRIER:
+        case NPC_ORB_ROTATION_FOCUS:
+        case NPC_METEOR_STRIKE_MAIN:
+        case NPC_METEOR_STRIKE_1:
+        case NPC_METEOR_STRIKE_2:
+        case NPC_METEOR_STRIKE_3:
+        case NPC_METEOR_STRIKE_4:
+        case NPC_METEOR_STRIKE_FLAME:
+            pCreature->AI()->SetReactState(REACT_PASSIVE);
+            pCreature->SetCanEnterCombat(false);
+            break;
+    }
 }
 
 // Wrapper to unlock the flame wall in from of Zarithrian
@@ -170,8 +209,10 @@ void instance_ruby_sanctum::SetData(uint32 uiType, uint32 uiData)
             // Don't set the same data twice
             if (m_auiEncounter[uiType] == uiData)
                 return;
+
             m_auiEncounter[uiType] = uiData;
             DoUseDoorOrButton(GO_FLAME_RING);
+            DoUseDoorOrButton(GO_TWILIGHT_FLAME_RING);
 
             // encounter unit frame
             if (uiData == DONE || uiData == FAIL)
@@ -181,6 +222,9 @@ void instance_ruby_sanctum::SetData(uint32 uiType, uint32 uiData)
                     SendEncounterFrame(ENCOUNTER_FRAME_DISENGAGE, pDragon->GetObjectGuid());
                 if (Creature* pDragon = GetSingleCreatureFromStorage(NPC_HALION_TWILIGHT))
                     SendEncounterFrame(ENCOUNTER_FRAME_DISENGAGE, pDragon->GetObjectGuid());
+
+                // disable world state
+                DoUpdateWorldState(WORLD_STATE_CORPOREALITY, 0);
             }
 
             // cleanup
@@ -203,9 +247,23 @@ void instance_ruby_sanctum::SetData(uint32 uiType, uint32 uiData)
 
                     // Despawn the portals
                     if (GameObject* pPortal = GetSingleGameObjectFromStorage(GO_TWILIGHT_PORTAL_ENTER_1))
+                    {
+                        pPortal->SetForcedDespawn();
                         pPortal->SetLootState(GO_JUST_DEACTIVATED);
+                    }
 
-                    // ToDo: despawn the other portals as well, and disable world state
+                    for (const auto& guid : m_lTwilightPortalsGuidList)
+                    {
+                        if (GameObject* pPortal = instance->GetGameObject(guid))
+                        {
+                            pPortal->SetForcedDespawn();
+                            pPortal->SetLootState(GO_JUST_DEACTIVATED);
+                        }
+                    }
+
+                    // reset the controller
+                    if (Creature* pController = GetSingleCreatureFromStorage(NPC_HALION_CONTROLLER))
+                        pController->AI()->EnterEvadeMode();
                     break;
             }
             break;
@@ -263,7 +321,13 @@ void instance_ruby_sanctum::Update(uint32 uiDiff)
                     if (Creature* pSummoner = GetSingleCreatureFromStorage(NPC_HALION_CONTROLLER))
                     {
                         if (Creature* pHalion = pSummoner->SummonCreature(NPC_HALION_REAL, pSummoner->GetPositionX(), pSummoner->GetPositionY(), pSummoner->GetPositionZ(), 3.159f, TEMPSPAWN_DEAD_DESPAWN, 0))
+                        {
                             DoScriptText(SAY_HALION_SPAWN, pHalion);
+                            pHalion->SetPhaseMask(1, true);
+                        }
+
+                        if (Creature* pHalion = pSummoner->SummonCreature(NPC_HALION_TWILIGHT, pSummoner->GetPositionX(), pSummoner->GetPositionY(), pSummoner->GetPositionZ(), 3.159f, TEMPSPAWN_DEAD_DESPAWN, 0))
+                            pHalion->SetPhaseMask(32, true);
                     }
                     m_uiHalionSummonTimer = 0;
                     break;
@@ -280,10 +344,13 @@ void instance_ruby_sanctum::Update(uint32 uiDiff)
         if (m_uiHalionResetTimer <= uiDiff)
         {
             if (Creature* pSummoner = GetSingleCreatureFromStorage(NPC_HALION_CONTROLLER))
-                pSummoner->SummonCreature(NPC_HALION_REAL, pSummoner->GetPositionX(), pSummoner->GetPositionY(), pSummoner->GetPositionZ(), 3.159f, TEMPSPAWN_DEAD_DESPAWN, 0);
+            {
+                if (Creature* pHalion = pSummoner->SummonCreature(NPC_HALION_REAL, pSummoner->GetPositionX(), pSummoner->GetPositionY(), pSummoner->GetPositionZ(), 3.159f, TEMPSPAWN_DEAD_DESPAWN, 0))
+                    pHalion->SetPhaseMask(1, true);
 
-            if (Creature* pHalion = GetSingleCreatureFromStorage(NPC_HALION_TWILIGHT))
-                pHalion->Respawn();
+                if (Creature* pHalion = pSummoner->SummonCreature(NPC_HALION_TWILIGHT, pSummoner->GetPositionX(), pSummoner->GetPositionY(), pSummoner->GetPositionZ(), 3.159f, TEMPSPAWN_DEAD_DESPAWN, 0))
+                    pHalion->SetPhaseMask(32, true);
+            }
 
             m_uiHalionResetTimer = 0;
         }

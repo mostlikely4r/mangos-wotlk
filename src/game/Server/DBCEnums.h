@@ -265,8 +265,8 @@ enum AreaFlags
     AREA_FLAG_UNK6                  = 0x00080000,           // Valgarde and Acherus: The Ebon Hold
     AREA_FLAG_LOWLEVEL              = 0x00100000,           // used for some starting areas with area_level <=15
     AREA_FLAG_TOWN                  = 0x00200000,           // small towns with Inn
-    AREA_FLAG_UNK7                  = 0x00400000,           // Warsong Hold, Acherus: The Ebon Hold, New Agamand Inn, Vengeance Landing Inn
-    AREA_FLAG_UNK8                  = 0x00800000,           // Westguard Inn, Acherus: The Ebon Hold, Valgarde
+    AREA_FLAG_REST_ZONE_HORDE       = 0x00400000,           // Instead of using areatriggers, the zone will act as one for Horde players (Warsong Hold, Acherus: The Ebon Hold, New Agamand Inn, Vengeance Landing Inn, Sunreaver Pavilion, etc)
+    AREA_FLAG_REST_ZONE_ALLIANCE    = 0x00800000,           // Instead of using areatriggers, the zone will act as one for Alliance players (Valgarde, Acherus: The Ebon Hold, Westguard Inn, Silver Covenant Pavilion, etc)
     AREA_FLAG_OUTDOOR_PVP           = 0x01000000,           // Wintergrasp and it's subzones
     AREA_FLAG_INSIDE                = 0x02000000,           // used for determinating spell related inside/outside questions in Map::IsOutdoors
     AREA_FLAG_OUTSIDE               = 0x04000000,           // used for determinating spell related inside/outside questions in Map::IsOutdoors
@@ -287,6 +287,8 @@ enum Difficulty
     RAID_DIFFICULTY_10MAN_HEROIC = 2,
     RAID_DIFFICULTY_25MAN_HEROIC = 3,
 };
+
+#define RAID_DIFFICULTY_MASK_25MAN 1    // since 25man difficulties are 1 and 3, we can check them like that
 
 #define MAX_DUNGEON_DIFFICULTY     2
 #define MAX_RAID_DIFFICULTY        4
@@ -334,6 +336,11 @@ enum MapTypes                                               // Lua_IsInInstance
     MAP_RAID            = 2,                                // raid
     MAP_BATTLEGROUND    = 3,                                // pvp
     MAP_ARENA           = 4                                 // arena
+};
+
+enum MapFlags
+{
+    MAP_FLAG_DYNAMIC_DIFFICULTY = 0x100
 };
 
 enum AbilytyLearnType
@@ -535,10 +542,10 @@ enum VehicleSeatFlags
     SEAT_FLAG_HIDE_PASSENGER        = 0x00000200,           // Passenger is hidden
     SEAT_FLAG_ALLOW_TURNING         = 0x00000400,           // "AllowsTurning" | Note: allows the passenger to turn (change orientation) while boarded
     SEAT_FLAG_CAN_CONTROL           = 0x00000800,           // Lua_UnitInVehicleControlSeat
-    // SEAT_FLAG_UNK11              = 0x00001000,           // "Can Cast Mount Spell" | Note: there are no seats with this flag in 3.3.5a
+    SEAT_FLAG_CAN_CAST_MOUNT_SPELL  = 0x00001000,           // "Can Cast Mount Spell" | Note: there are no seats with this flag in 3.3.5a
     SEAT_FLAG_UNCONTROLLED          = 0x00002000,           // "Uncontrolled"
     SEAT_FLAG_CAN_ATTACK            = 0x00004000,           // Can attack, cast spells and use items from vehicle?
-    SEAT_FLAG_UNK13                 = 0x00008000,           // "ShouldUseVehicleSeatExitAnimationOnForcedExit"
+    SEAT_FLAG_SHOULD_USE_VEH_SEAT_EXIT_ANIM_ON_FORCED_EXIT = 0x00008000,           // "ShouldUseVehicleSeatExitAnimationOnForcedExit"
     SEAT_FLAG_UNK14                 = 0x00010000,
     SEAT_FLAG_UNK15                 = 0x00020000,
     SEAT_FLAG_UNK16                 = 0x00040000,           // "HasVehicleExitAnimForVoluntaryExit"

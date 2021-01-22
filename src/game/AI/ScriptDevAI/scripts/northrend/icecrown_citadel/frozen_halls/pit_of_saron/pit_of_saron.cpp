@@ -1,201 +1,643 @@
 /* This file is part of the ScriptDev2 Project. See AUTHORS file for Copyright information
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 
 /* ScriptData
-SDName: pit_of_saron
-SD%Complete: 100
+SDName: instance_pit_of_saron
+SD%Complete: 80%
 SDComment:
 SDCategory: Pit of Saron
 EndScriptData */
-
-/* ContentData
-EndContentData */
 
 #include "AI/ScriptDevAI/include/sc_common.h"
 #include "pit_of_saron.h"
 
 enum
 {
-    // Ambush event
-    SPELL_EMPOWERED_SHADOW_BOLT         = 69528,
-    SPELL_SUMMON_UNDEAD                 = 69516,
+    // Intro spells
+    SPELL_NECROMATIC_POWER          = 69347,
+    SPELL_FEIGN_DEATH               = 28728,
+    SPELL_RAISE_DEAD                = 69350,
 
-    // Icicles
-    SPELL_ICICLE                        = 69426,
-    SPELL_ICICLE_DUMMY                  = 69428,
-    SPELL_ICE_SHARDS_H                  = 70827,            // used to check the tunnel achievement
+    // Garfrost outro
+    SAY_TYRANNUS_GARFROST           = -1658020,
+    SAY_GENERAL_GARFROST            = -1658021,
+
+    // Ick and Krick outro
+    SAY_JAINA_KRICK_1               = -1658036,
+    SAY_SYLVANAS_KRICK_1            = -1658037,
+    SAY_OUTRO_2                     = -1658038,
+    SAY_JAINA_KRICK_2               = -1658039,
+    SAY_SYLVANAS_KRICK_2            = -1658040,
+    SAY_OUTRO_3                     = -1658041,
+    SAY_TYRANNUS_KRICK_1            = -1658042,
+    SAY_OUTRO_4                     = -1658043,
+    SAY_TYRANNUS_KRICK_2            = -1658044,
+    SAY_JAINA_KRICK_3               = -1658045,
+    SAY_SYLVANAS_KRICK_3            = -1658046,
+
+    // Ick and Krick outro spells
+    SPELL_STRANGULATING             = 69413,
+    SPELL_KRICK_KILL_CREDIT         = 71308,
+    SPELL_SUICIDE                   = 7,
+
+    // Ambush and Gauntlet
+    SAY_TYRANNUS_AMBUSH_1           = -1658047,
+    SAY_TYRANNUS_AMBUSH_2           = -1658048,
+    SAY_GAUNTLET                    = -1658049,
+
+    // Gauntlet spells
+    SPELL_ICICLE_SUMMON             = 69424,
+    SPELL_ACHIEVEMENT_CHECK         = 72845,
+
+    // Tyrannus intro
+    SAY_PREFIGHT_1                  = -1658050,
+    SAY_VICTUS_TRASH                = -1658051,
+    SAY_IRONSKULL_TRASH             = -1658068,
+    SAY_PREFIGHT_2                  = -1658052,
+
+    SPELL_EJECT_ALL_PASSENGERS      = 50630,
+    // SPELL_CSA_DUMMY_EFFECT_1     = 56685,                // What is this?
+
+    // Sindragosa outro
+    SAY_VICTUS_OUTRO_1              = -1658061,
+    SAY_IRONSKULL_OUTRO_2           = -1658069,
+    SAY_GENERAL_OUTRO_2             = -1658062,
+    SAY_JAINA_OUTRO_1               = -1658063,
+    SAY_SYLVANAS_OUTRO_1            = -1658064,
+    SAY_JAINA_OUTRO_2               = -1658065,
+    SAY_JAINA_OUTRO_3               = -1658066,
+    SAY_SYLVANAS_OUTRO_2            = -1658067,
+
+    SPELL_FROST_BOMB                = 70521,
+    SPELL_FROZEN_AFTERMATH          = 70518,
+    SPELL_ARCANE_FORM               = 70573,
+    SPELL_CALL_OF_SYLVANAS_1        = 70636,                // triggers 70639
+    SPELL_CALL_OF_SYLVANAS_2        = 70638,
+    // SPELL_CALL_OF_SYLVANAS_3     = 70642,
+    SPELL_JAINAS_CALL_1             = 70527,                // triggers 70525
+    SPELL_JAINAS_CALL_2             = 70623,
 };
 
-/*######
-## npc_ymirjar_deathbringer
-######*/
-
-struct npc_ymirjar_deathbringerAI : public ScriptedAI
+static const DialogueEntryTwoSide aPoSDialogues[] =
 {
-    npc_ymirjar_deathbringerAI(Creature* pCreature) : ScriptedAI(pCreature) { Reset(); }
+    // Garfrost outro
+    {NPC_GARFROST,         0,                  0,                    0,                  4000},         // ToDo: move the freed slaves to position
+    {SAY_GENERAL_GARFROST, NPC_VICTUS_PART1,   SAY_GENERAL_GARFROST, NPC_IRONSKULL_PART1, 2000},
+    {SAY_TYRANNUS_GARFROST, NPC_TYRANNUS_INTRO, 0,                   0,                  0},
 
-    uint32 m_uiShadowBoltTimer;
+    // Ick and Krick outro
+    {SAY_JAINA_KRICK_1,    NPC_JAINA_PART1,    SAY_SYLVANAS_KRICK_1, NPC_SYLVANAS_PART1, 6000},
+    {SAY_OUTRO_2,          NPC_KRICK,          0,                    0,                  16000},
+    {SAY_JAINA_KRICK_2,    NPC_JAINA_PART1,    SAY_SYLVANAS_KRICK_2, NPC_SYLVANAS_PART1, 7000},
+    {SAY_OUTRO_3,          NPC_KRICK,          0,                    0,                  7000},
+    {SAY_TYRANNUS_KRICK_1, NPC_TYRANNUS_INTRO, 0,                    0,                  3000},
+    {SPELL_STRANGULATING,  0,                  0,                    0,                  3000},
+    {SAY_OUTRO_4,          NPC_KRICK,          0,                    0,                  3000},
+    {SAY_TYRANNUS_KRICK_2, NPC_TYRANNUS_INTRO, 0,                    0,                  11000},
+    {SAY_JAINA_KRICK_3,    NPC_JAINA_PART1,    SAY_SYLVANAS_KRICK_3, NPC_SYLVANAS_PART1, 0},
 
-    void Reset() override
+    // Tyrannus intro
+    {NPC_TYRANNUS,         0,                  0,                    0,                  10000},        // ToDo: move the freed slaves to position
+    {SAY_PREFIGHT_1,       NPC_TYRANNUS,       0,                    0,                  13000},
+    {SAY_VICTUS_TRASH,     NPC_VICTUS_PART2,   SAY_IRONSKULL_TRASH,  NPC_IRONSKULL_PART2, 9000},
+    {SAY_PREFIGHT_2,       NPC_TYRANNUS,       0,                    0,                  10000},
+    {NPC_RIMEFANG,         0,                  0,                    0,                  0},
+
+    // Tyrannus outro
+    {NPC_SINDRAGOSA,       0,                  0,                    0,                  30000},
+    {SAY_VICTUS_OUTRO_1,   NPC_VICTUS_PART2,   SAY_IRONSKULL_OUTRO_2, NPC_IRONSKULL_PART2, 17000},
+    {SAY_GENERAL_OUTRO_2,  NPC_VICTUS_PART2,   SAY_GENERAL_OUTRO_2,  NPC_IRONSKULL_PART2, 14000},
+    {SAY_JAINA_OUTRO_1,    NPC_JAINA_PART2,    SAY_SYLVANAS_OUTRO_1, NPC_SYLVANAS_PART2,  1000},
+    {SPELL_FROST_BOMB,     0,                  0,                    0,                   7000},
+    {NPC_JAINA_PART2,      0,                  0,                    0,                   8000},
+    {SAY_JAINA_OUTRO_2,    NPC_JAINA_PART2,    SAY_SYLVANAS_OUTRO_2, NPC_SYLVANAS_PART2,  15000},
+    {SAY_JAINA_OUTRO_3,    NPC_JAINA_PART2,    0,                    0,                   0},
+    {0, 0, 0},
+};
+
+instance_pit_of_saron::instance_pit_of_saron(Map* pMap) : ScriptedInstance(pMap), DialogueHelper(aPoSDialogues),
+    m_uiAmbushAggroCount(0),
+    m_uiTeam(TEAM_NONE),
+    m_uiSummonDelayTimer(0),
+    m_uiIciclesTimer(0)
+{
+    Initialize();
+}
+
+void instance_pit_of_saron::Initialize()
+{
+    memset(&m_auiEncounter, 0, sizeof(m_auiEncounter));
+    InitializeDialogueHelper(this);
+
+    for (bool& i : m_abAchievCriteria)
+        i = false;
+}
+
+void instance_pit_of_saron::OnPlayerEnter(Player* pPlayer)
+{
+    if (!m_uiTeam)                                          // very first player to enter
     {
-        m_uiShadowBoltTimer = urand(1000, 3000);
-    }
+        m_uiTeam = pPlayer->GetTeam();
+        SetDialogueSide(m_uiTeam == ALLIANCE);
 
-    void MovementInform(uint32 uiMotionType, uint32 uiPointId) override
-    {
-        if (uiMotionType != POINT_MOTION_TYPE || !uiPointId)
+        // dialogue starts on timer if any of the first two bosses are not already dead
+        if (GetData(TYPE_GARFROST) == DONE || GetData(TYPE_KRICK) == DONE)
             return;
 
-        DoCastSpellIfCan(m_creature, SPELL_SUMMON_UNDEAD);
+        m_uiSummonDelayTimer = 10000;
     }
+}
 
-    void UpdateAI(const uint32 uiDiff) override
+void instance_pit_of_saron::OnCreatureCreate(Creature* pCreature)
+{
+    switch (pCreature->GetEntry())
     {
-        if (!m_creature->SelectHostileTarget() || !m_creature->GetVictim())
-            return;
-
-        if (m_uiShadowBoltTimer < uiDiff)
-        {
-            if (Unit* pTarget = m_creature->SelectAttackingTarget(ATTACKING_TARGET_RANDOM, 0))
+        case NPC_TYRANNUS_INTRO:
+        case NPC_JAINA_PART1:
+        case NPC_SYLVANAS_PART1:
+        case NPC_GARFROST:
+        case NPC_KRICK:
+        case NPC_ICK:
+        case NPC_TYRANNUS:
+        case NPC_RIMEFANG:
+        case NPC_IRONSKULL_PART1:
+        case NPC_VICTUS_PART1:
+        case NPC_IRONSKULL_PART2:
+        case NPC_VICTUS_PART2:
+        case NPC_JAINA_PART2:
+        case NPC_SYLVANAS_PART2:
+        case NPC_SINDRAGOSA:
+            m_npcEntryGuidStore[pCreature->GetEntry()] = pCreature->GetObjectGuid();
+            break;
+        case NPC_STALKER:
+            m_lTunnelStalkersGuidList.push_back(pCreature->GetObjectGuid());
+            break;
+        case NPC_YMIRJAR_DEATHBRINGER:
+        case NPC_YMIRJAR_WRATHBRINGER:
+        case NPC_YMIRJAR_FLAMEBEARER:
+        case NPC_FALLEN_WARRIOR:
+        case NPC_COLDWRAITH:
+            // Sort only the temporary summons
+            if (pCreature->IsTemporarySummon())
+                m_lAmbushNpcsGuidList.push_back(pCreature->GetObjectGuid());
+            break;
+        case NPC_GENERAL_BUNNY:
+            if (pCreature->GetPositionY() < 130.0f)
             {
-                if (DoCastSpellIfCan(pTarget, SPELL_EMPOWERED_SHADOW_BOLT) == CAST_OK)
-                    m_uiShadowBoltTimer = urand(2000, 3000);
+                if (pCreature->GetOrientation() != 0)
+                    m_lArcaneShieldBunniesGuidList.push_back(pCreature->GetObjectGuid());
+                else
+                    m_lFrozenAftermathBunniesGuidList.push_back(pCreature->GetObjectGuid());
+            }
+            break;
+    }
+}
+
+void instance_pit_of_saron::OnObjectCreate(GameObject* pGo)
+{
+    switch (pGo->GetEntry())
+    {
+        case GO_ICEWALL:
+            if (m_auiEncounter[TYPE_GARFROST] == DONE && m_auiEncounter[TYPE_KRICK] == DONE)
+                pGo->SetGoState(GO_STATE_ACTIVE);
+            break;
+        case GO_HALLS_OF_REFLECT_PORT:
+            break;
+        case GO_SARONITE_ROCK:
+            m_lSaroniteRockGuidList.push_back(pGo->GetObjectGuid());
+            break;
+
+        default:
+            return;
+    }
+    m_goEntryGuidStore[pGo->GetEntry()] = pGo->GetObjectGuid();
+}
+
+void instance_pit_of_saron::SetData(uint32 uiType, uint32 uiData)
+{
+    switch (uiType)
+    {
+        case TYPE_GARFROST:
+            if (uiData == DONE && m_auiEncounter[TYPE_KRICK] == DONE)
+                DoUseDoorOrButton(GO_ICEWALL);
+            if (uiData == DONE || uiData == FAIL)
+            {
+                for (const auto& guid : m_lSaroniteRockGuidList)
+                    if (GameObject* pRock = instance->GetGameObject(guid))
+                        pRock->SetLootState(GO_JUST_DEACTIVATED);
+
+                m_lSaroniteRockGuidList.clear();
+            }
+            if (uiData == IN_PROGRESS)
+                SetSpecialAchievementCriteria(TYPE_ACHIEV_DOESNT_GO_ELEVEN, true);
+            else if (uiData == DONE)
+                StartNextDialogueText(NPC_GARFROST);
+            m_auiEncounter[uiType] = uiData;
+            break;
+        case TYPE_KRICK:
+            if (uiData == DONE && m_auiEncounter[TYPE_GARFROST] == DONE)
+                DoUseDoorOrButton(GO_ICEWALL);
+            if (uiData == SPECIAL)
+            {
+                // Used just to start the epilogue
+                StartNextDialogueText(SAY_JAINA_KRICK_1);
+                return;
+            }
+            m_auiEncounter[uiType] = uiData;
+            break;
+        case TYPE_TYRANNUS:
+            if (uiData == DONE)
+                StartNextDialogueText(NPC_SINDRAGOSA);
+            else if (uiData == SPECIAL)
+            {
+                // Used just to start the intro
+                StartNextDialogueText(NPC_TYRANNUS);
+                return;
+            }
+            m_auiEncounter[uiType] = uiData;
+            break;
+        case TYPE_AMBUSH:
+            if (uiData == DONE)
+            {
+                // Complete tunnel achievement
+                if (Creature* pTyrannus = GetSingleCreatureFromStorage(NPC_TYRANNUS))
+                    pTyrannus->CastSpell(pTyrannus, SPELL_ACHIEVEMENT_CHECK, TRIGGERED_OLD_TRIGGERED);
+
+                m_uiIciclesTimer = 0;
+            }
+            m_auiEncounter[uiType] = uiData;
+            break;
+        default:
+            return;
+    }
+
+    if (uiData == DONE)
+    {
+        OUT_SAVE_INST_DATA;
+
+        std::ostringstream saveStream;
+        saveStream << m_auiEncounter[0] << " " << m_auiEncounter[1] << " " << m_auiEncounter[2] << " " << m_auiEncounter[3];
+
+        m_strInstData = saveStream.str();
+
+        SaveToDB();
+        OUT_SAVE_INST_DATA_COMPLETE;
+    }
+}
+
+void instance_pit_of_saron::Load(const char* chrIn)
+{
+    if (!chrIn)
+    {
+        OUT_LOAD_INST_DATA_FAIL;
+        return;
+    }
+
+    OUT_LOAD_INST_DATA(chrIn);
+
+    std::istringstream loadStream(chrIn);
+    loadStream >> m_auiEncounter[0] >> m_auiEncounter[1] >> m_auiEncounter[2] >> m_auiEncounter[3];
+
+    for (uint32& i : m_auiEncounter)
+    {
+        if (i == IN_PROGRESS)
+            i = NOT_STARTED;
+    }
+
+    OUT_LOAD_INST_DATA_COMPLETE;
+}
+
+uint32 instance_pit_of_saron::GetData(uint32 uiType) const
+{
+    if (uiType < MAX_ENCOUNTER)
+        return m_auiEncounter[uiType];
+
+    return 0;
+}
+
+void instance_pit_of_saron::OnCreatureEnterCombat(Creature* pCreature)
+{
+    if (pCreature->GetEntry() == NPC_YMIRJAR_DEATHBRINGER)
+    {
+        ++m_uiAmbushAggroCount;
+
+        // Summon the rest of the mobs at the 2nd ambush
+        if (m_uiAmbushAggroCount == 2)
+        {
+            Creature* pTyrannus = GetSingleCreatureFromStorage(NPC_TYRANNUS_INTRO);
+            if (!pTyrannus)
+                return;
+
+            DoScriptText(SAY_TYRANNUS_AMBUSH_2, pTyrannus);
+            pTyrannus->SetWalk(false);
+            pTyrannus->GetMotionMaster()->MovePoint(0, afTyrannusMovePos[2][0], afTyrannusMovePos[2][1], afTyrannusMovePos[2][2]);
+
+            // Spawn Mobs
+            for (const auto& aEventSecondAmbushLocation : aEventSecondAmbushLocations)
+            {
+                if (Creature* pSummon = pTyrannus->SummonCreature(aEventSecondAmbushLocation.uiEntryHorde, aEventSecondAmbushLocation.fX, aEventSecondAmbushLocation.fY,
+                    aEventSecondAmbushLocation.fZ, aEventSecondAmbushLocation.fO, TEMPSPAWN_DEAD_DESPAWN, 0))
+                {
+                    pSummon->SetWalk(false);
+                    pSummon->GetMotionMaster()->MovePoint(1, aEventSecondAmbushLocation.fMoveX, aEventSecondAmbushLocation.fMoveY, aEventSecondAmbushLocation.fMoveZ);
+                }
             }
         }
-        else
-            m_uiShadowBoltTimer -= uiDiff;
-
-        DoMeleeAttackIfReady();
     }
-};
-
-UnitAI* GetAI_npc_ymirjar_deathbringer(Creature* pCreature)
-{
-    return new npc_ymirjar_deathbringerAI(pCreature);
 }
 
-bool EffectDummyCreature_spell_summon_undead(Unit* /*pCaster*/, uint32 uiSpellId, SpellEffectIndex uiEffIndex, Creature* pCreatureTarget, ObjectGuid /*originalCasterGuid*/)
+void instance_pit_of_saron::OnCreatureDeath(Creature* pCreature)
 {
-    // always check spellid and effectindex
-    if (uiSpellId == SPELL_SUMMON_UNDEAD && uiEffIndex == EFFECT_INDEX_0)
+    switch (pCreature->GetEntry())
     {
-        if (pCreatureTarget->GetEntry() != NPC_YMIRJAR_DEATHBRINGER)
-            return true;
+        case NPC_YMIRJAR_DEATHBRINGER:
+        case NPC_YMIRJAR_WRATHBRINGER:
+        case NPC_YMIRJAR_FLAMEBEARER:
+        case NPC_FALLEN_WARRIOR:
+        case NPC_COLDWRAITH:
+            // Check for tunnel event end - these mobs are not summoned
+            if (pCreature->IsTemporarySummon())
+            {
+                m_lAmbushNpcsGuidList.remove(pCreature->GetObjectGuid());
 
-        float fX, fY, fZ;
-        for (uint8 i = 0; i < 4; ++i)
+                // If empty start tunnel event
+                if (m_lAmbushNpcsGuidList.empty())
+                {
+                    Creature* pTyrannus = GetSingleCreatureFromStorage(NPC_TYRANNUS_INTRO);
+                    if (!pTyrannus)
+                        return;
+
+                    DoScriptText(SAY_GAUNTLET, pTyrannus);
+                    pTyrannus->SetWalk(false);
+                    pTyrannus->GetMotionMaster()->MovePoint(0, afTyrannusMovePos[0][0], afTyrannusMovePos[0][1], afTyrannusMovePos[0][2]);
+                    pTyrannus->ForcedDespawn(20000);
+
+                    m_uiIciclesTimer = urand(3000, 5000);
+                    SetSpecialAchievementCriteria(TYPE_ACHIEV_DONT_LOOK_UP, true);
+                }
+            }
+            break;
+    }
+}
+
+void instance_pit_of_saron::SetSpecialAchievementCriteria(uint32 uiType, bool bIsMet)
+{
+    if (uiType < MAX_SPECIAL_ACHIEV_CRITS)
+        m_abAchievCriteria[uiType] = bIsMet;
+}
+
+bool instance_pit_of_saron::CheckAchievementCriteriaMeet(uint32 uiCriteriaId, Player const* /*pSource*/, Unit const* /*pTarget*/, uint32 /*uiMiscValue1 = 0*/) const
+{
+    switch (uiCriteriaId)
+    {
+        case ACHIEV_CRIT_DOESNT_GO_ELEVEN:
+            return m_abAchievCriteria[TYPE_ACHIEV_DOESNT_GO_ELEVEN];
+        case ACHIEV_CRIT_DONT_LOOK_UP:
+            return m_abAchievCriteria[TYPE_ACHIEV_DONT_LOOK_UP];
+
+        default:
+            return false;
+    }
+}
+
+void instance_pit_of_saron::JustDidDialogueStep(int32 iEntry)
+{
+    switch (iEntry)
+    {
+        case SPELL_NECROMATIC_POWER:
+            // Transfor all soldiers into undead
+            if (Creature* pTyrannus = GetSingleCreatureFromStorage(NPC_TYRANNUS_INTRO))
+                pTyrannus->CastSpell(pTyrannus, SPELL_NECROMATIC_POWER, TRIGGERED_OLD_TRIGGERED);
+            break;
+        case SAY_OUTRO_3:
+            // Move Tyrannus into position
+            if (Creature* pTyrannus = GetSingleCreatureFromStorage(NPC_TYRANNUS_INTRO))
+            {
+                pTyrannus->SetWalk(false);
+                pTyrannus->GetMotionMaster()->MovePoint(0, afTyrannusMovePos[1][0], afTyrannusMovePos[1][1], afTyrannusMovePos[1][2]);
+            }
+            break;
+        case SPELL_STRANGULATING:
+            // Strangulate Krick
+            if (Creature* pKrick = GetSingleCreatureFromStorage(NPC_KRICK))
+            {
+                pKrick->CastSpell(pKrick, SPELL_STRANGULATING, TRIGGERED_OLD_TRIGGERED);
+                pKrick->SetLevitate(true);
+                pKrick->GetMotionMaster()->MovePoint(0, pKrick->GetPositionX(), pKrick->GetPositionY(), pKrick->GetPositionZ() + 5.0f);
+            }
+            break;
+        case SAY_TYRANNUS_KRICK_2:
+            // Kill Krick
+            if (Creature* pKrick = GetSingleCreatureFromStorage(NPC_KRICK))
+            {
+                pKrick->CastSpell(pKrick, SPELL_KRICK_KILL_CREDIT, TRIGGERED_OLD_TRIGGERED);
+                pKrick->CastSpell(pKrick, SPELL_SUICIDE, TRIGGERED_OLD_TRIGGERED);
+            }
+            break;
+        case SAY_JAINA_KRICK_3:
+            // Move Tyrannus to a safe position
+            if (Creature* pTyrannus = GetSingleCreatureFromStorage(NPC_TYRANNUS_INTRO))
+                pTyrannus->GetMotionMaster()->MovePoint(0, afTyrannusMovePos[0][0], afTyrannusMovePos[0][1], afTyrannusMovePos[0][2]);
+            break;
+        case NPC_TYRANNUS:
         {
-            pCreatureTarget->GetNearPoint(pCreatureTarget, fX, fY, fZ, 0, frand(8.0f, 12.0f), M_PI_F * 0.5f * i);
-            pCreatureTarget->SummonCreature(i % 2 ? NPC_YMIRJAR_WRATHBRINGER : NPC_YMIRJAR_FLAMEBEARER, fX, fY, fZ, 3.75f, TEMPSPAWN_DEAD_DESPAWN, 0);
+            Creature* pTyrannus = GetSingleCreatureFromStorage(NPC_TYRANNUS);
+            if (!pTyrannus)
+                return;
+
+            // Spawn tunnel end event mobs
+            for (const auto& aEventTunnelEndLocation : aEventTunnelEndLocations)
+            {
+                if (Creature* pSummon = pTyrannus->SummonCreature(m_uiTeam == HORDE ? aEventTunnelEndLocation.uiEntryHorde : aEventTunnelEndLocation.uiEntryAlliance,
+                    aEventTunnelEndLocation.fX, aEventTunnelEndLocation.fY, aEventTunnelEndLocation.fZ, aEventTunnelEndLocation.fO, TEMPSPAWN_DEAD_DESPAWN, 0))
+                {
+                    pSummon->SetWalk(false);
+                    pSummon->GetMotionMaster()->MovePoint(0, aEventTunnelEndLocation.fMoveX, aEventTunnelEndLocation.fMoveY, aEventTunnelEndLocation.fMoveZ);
+                }
+            }
+            break;
         }
+        case NPC_RIMEFANG:
+            // Eject Tyrannus and prepare for combat
+            if (Creature* pRimefang = GetSingleCreatureFromStorage(NPC_RIMEFANG))
+            {
+                pRimefang->CastSpell(pRimefang, SPELL_EJECT_ALL_PASSENGERS, TRIGGERED_OLD_TRIGGERED);
+                pRimefang->SetWalk(false);
+                pRimefang->GetMotionMaster()->MovePoint(0, afTyrannusMovePos[3][0], afTyrannusMovePos[3][1], afTyrannusMovePos[3][2]);
+            }
+            if (Creature* pTyrannus = GetSingleCreatureFromStorage(NPC_TYRANNUS))
+                pTyrannus->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+            break;
+        case SAY_VICTUS_OUTRO_1:
+        {
+            Player* pPlayer = GetPlayerInMap();
+            if (!pPlayer)
+                return;
 
-        // always return true when we are handling this spell and effect
-        return true;
+            // Spawn Sindragosa
+            if (Creature* pSummon = pPlayer->SummonCreature(aEventOutroLocations[0].uiEntryHorde, aEventOutroLocations[0].fX, aEventOutroLocations[0].fY,
+                                    aEventOutroLocations[0].fZ, aEventOutroLocations[0].fO, TEMPSPAWN_TIMED_DESPAWN, 2 * MINUTE * IN_MILLISECONDS))
+            {
+                pSummon->SetWalk(false);
+                pSummon->GetMotionMaster()->MovePoint(0, aEventOutroLocations[0].fMoveX, aEventOutroLocations[0].fMoveY, aEventOutroLocations[0].fMoveZ);
+            }
+            // Spawn Jaina or Sylvanas
+            if (Creature* pSummon = pPlayer->SummonCreature(m_uiTeam == HORDE ? aEventOutroLocations[1].uiEntryHorde : aEventOutroLocations[1].uiEntryAlliance,
+                                    aEventOutroLocations[1].fX, aEventOutroLocations[1].fY, aEventOutroLocations[1].fZ, aEventOutroLocations[1].fO, TEMPSPAWN_TIMED_DESPAWN, 24 * HOUR * IN_MILLISECONDS))
+            {
+                pSummon->SetWalk(false);
+                pSummon->GetMotionMaster()->MovePoint(0, aEventOutroLocations[1].fMoveX, aEventOutroLocations[1].fMoveY, aEventOutroLocations[1].fMoveZ);
+            }
+            break;
+        }
+        case SAY_JAINA_OUTRO_1:
+            // Visual effect
+            for (GuidList::const_iterator itr = m_lArcaneShieldBunniesGuidList.begin(); itr != m_lArcaneShieldBunniesGuidList.end(); ++itr)
+            {
+                if (Creature* pBunny = instance->GetCreature(*itr))
+                    pBunny->CastSpell(pBunny, SPELL_ARCANE_FORM, TRIGGERED_OLD_TRIGGERED);
+            }
+            // Teleport players
+            if (Creature* pTemp = GetSingleCreatureFromStorage(m_uiTeam == HORDE ? NPC_SYLVANAS_PART2 : NPC_JAINA_PART2))
+            {
+                pTemp->CastSpell(pTemp, m_uiTeam == HORDE ? SPELL_CALL_OF_SYLVANAS_2 : SPELL_JAINAS_CALL_2, TRIGGERED_OLD_TRIGGERED);
+                pTemp->CastSpell(pTemp, m_uiTeam == HORDE ? SPELL_CALL_OF_SYLVANAS_2 : SPELL_JAINAS_CALL_2, TRIGGERED_OLD_TRIGGERED);
+            }
+            break;
+        case SPELL_FROST_BOMB:
+            // Frost bomb on the platform
+            if (Creature* pSindragosa = GetSingleCreatureFromStorage(NPC_SINDRAGOSA))
+                pSindragosa->CastSpell(pSindragosa, SPELL_FROST_BOMB, TRIGGERED_OLD_TRIGGERED);
+            // Visual effect
+            for (GuidList::const_iterator itr = m_lFrozenAftermathBunniesGuidList.begin(); itr != m_lFrozenAftermathBunniesGuidList.end(); ++itr)
+            {
+                if (Creature* pBunny = instance->GetCreature(*itr))
+                    pBunny->CastSpell(pBunny, SPELL_FROZEN_AFTERMATH, TRIGGERED_OLD_TRIGGERED);
+            }
+            break;
+        case NPC_JAINA_PART2:
+            // Visual effect remove
+            for (GuidList::const_iterator itr = m_lArcaneShieldBunniesGuidList.begin(); itr != m_lArcaneShieldBunniesGuidList.end(); ++itr)
+            {
+                if (Creature* pBunny = instance->GetCreature(*itr))
+                    pBunny->RemoveAurasDueToSpell(SPELL_ARCANE_FORM);
+            }
+            // Sindragosa exit
+            if (Creature* pSindragosa = GetSingleCreatureFromStorage(NPC_SINDRAGOSA))
+                pSindragosa->GetMotionMaster()->MovePoint(0, 759.148f, 199.955f, 720.857f);
+            // Jaina / Sylvanas starts moving (should use wp)
+            if (Creature* pTemp = GetSingleCreatureFromStorage(m_uiTeam == HORDE ? NPC_SYLVANAS_PART2 : NPC_JAINA_PART2))
+            {
+                pTemp->SetWalk(true);
+                pTemp->GetMotionMaster()->MovePoint(0, 1057.76f, 111.927f, 628.4123f);
+            }
+            break;
+        case SAY_JAINA_OUTRO_2:
+            if (Creature* pTemp = GetSingleCreatureFromStorage(m_uiTeam == HORDE ? NPC_SYLVANAS_PART2 : NPC_JAINA_PART2))
+                pTemp->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER);
+
+            // ToDo: Jaina / Sylvanas should have some waypoint movement here and the door should be opened only when they get in front of it.
+            DoUseDoorOrButton(GO_HALLS_OF_REFLECT_PORT);
+            break;
     }
-
-    return false;
 }
 
-/*######
-## npc_collapsing_icicle
-######*/
-
-struct npc_collapsing_icicleAI : public ScriptedAI
+void instance_pit_of_saron::DoStartAmbushEvent()
 {
-    npc_collapsing_icicleAI(Creature* pCreature) : ScriptedAI(pCreature)
+    Creature* pTyrannus = GetSingleCreatureFromStorage(NPC_TYRANNUS_INTRO);
+    if (!pTyrannus)
+        return;
+
+    DoScriptText(SAY_TYRANNUS_AMBUSH_1, pTyrannus);
+
+    // Spawn Mobs
+    for (const auto& aEventFirstAmbushLocation : aEventFirstAmbushLocations)
     {
-        m_pInstance = (instance_pit_of_saron*)pCreature->GetInstanceData();
-        Reset();
+        if (Creature* pSummon = pTyrannus->SummonCreature(aEventFirstAmbushLocation.uiEntryHorde, aEventFirstAmbushLocation.fX, aEventFirstAmbushLocation.fY,
+            aEventFirstAmbushLocation.fZ, aEventFirstAmbushLocation.fO, TEMPSPAWN_DEAD_DESPAWN, 0))
+        {
+            pSummon->SetWalk(false);
+            pSummon->GetMotionMaster()->MoveWaypoint(aEventFirstAmbushLocation.pathId);
+        }
     }
-
-    instance_pit_of_saron* m_pInstance;
-
-    void Reset() override
-    {
-        DoCastSpellIfCan(m_creature, SPELL_ICICLE_DUMMY, CAST_TRIGGERED);
-        DoCastSpellIfCan(m_creature, SPELL_ICICLE, CAST_TRIGGERED);
-    }
-
-    void SpellHitTarget(Unit* pTarget, const SpellEntry* pSpell) override
-    {
-        // Mark the achiev failed
-        if (pSpell->Id == SPELL_ICE_SHARDS_H && pTarget->GetTypeId() == TYPEID_PLAYER && m_pInstance)
-            m_pInstance->SetSpecialAchievementCriteria(TYPE_ACHIEV_DONT_LOOK_UP, false);
-    }
-
-    void AttackStart(Unit* /*pWho*/) override { }
-    void MoveInLineOfSight(Unit* /*pWho*/) override { }
-    void UpdateAI(const uint32 /*uiDiff*/) override { }
-};
-
-UnitAI* GetAI_npc_collapsing_icicle(Creature* pCreature)
-{
-    return new npc_collapsing_icicleAI(pCreature);
 }
 
-/*######
-## at_pit_of_saron
-######*/
-
-bool AreaTrigger_at_pit_of_saron(Player* pPlayer, AreaTriggerEntry const* pAt)
+void instance_pit_of_saron::Update(uint32 uiDiff)
 {
-    if (pPlayer->isGameMaster() || !pPlayer->IsAlive())
-        return false;
+    DialogueUpdate(uiDiff);
 
-    instance_pit_of_saron* pInstance = (instance_pit_of_saron*)pPlayer->GetInstanceData();
-    if (!pInstance)
-        return false;
-
-    if (pAt->id == AREATRIGGER_ID_TUNNEL_START)
+    if (m_uiSummonDelayTimer)
     {
-        if (pInstance->GetData(TYPE_GARFROST) != DONE || pInstance->GetData(TYPE_KRICK) != DONE ||
-                pInstance->GetData(TYPE_AMBUSH) != NOT_STARTED)
-            return false;
+        if (m_uiSummonDelayTimer <= uiDiff)
+        {
+            Player* pPlayer = GetPlayerInMap();
+            if (!pPlayer)
+            {
+                script_error_log("instance_pit_of_saron: Error: couldn't find any player in instance");
+                m_uiSummonDelayTimer = 0;
+                return;
+            }
 
-        pInstance->DoStartAmbushEvent();
-        pInstance->SetData(TYPE_AMBUSH, IN_PROGRESS);
-        return true;
+            // Spawn Begin Mobs; script handled in DB
+            for (const auto& aEventBeginLocation : aEventBeginLocations)
+            {
+                // ToDo: maybe despawn the intro npcs when the other events occur
+                if (Creature* pSummon = pPlayer->SummonCreature(m_uiTeam == HORDE ? aEventBeginLocation.uiEntryHorde : aEventBeginLocation.uiEntryAlliance,
+                    aEventBeginLocation.fX, aEventBeginLocation.fY, aEventBeginLocation.fZ, aEventBeginLocation.fO, TEMPSPAWN_TIMED_DESPAWN, 24 * HOUR * IN_MILLISECONDS))
+                {
+                    pSummon->SetWalk(false);
+                    pSummon->GetMotionMaster()->MoveWaypoint(aEventBeginLocation.pathId);
+                }
+            }
+
+            m_uiSummonDelayTimer = 0;
+        }
+        else
+            m_uiSummonDelayTimer -= uiDiff;
     }
-    if (pAt->id == AREATRIGGER_ID_TUNNEL_END)
+
+    if (m_uiIciclesTimer)
     {
-        if (pInstance->GetData(TYPE_AMBUSH) != IN_PROGRESS)
-            return false;
+        if (m_uiIciclesTimer <= uiDiff)
+        {
+            for (GuidList::const_iterator itr = m_lTunnelStalkersGuidList.begin(); itr != m_lTunnelStalkersGuidList.end(); ++itr)
+            {
+                // Only 5% of the stalkers will actually spawn an icicle
+                if (roll_chance_i(95))
+                    continue;
 
-        pInstance->SetData(TYPE_AMBUSH, DONE);
-        return true;
+                if (Creature* pStalker = instance->GetCreature(*itr))
+                    pStalker->CastSpell(pStalker, SPELL_ICICLE_SUMMON, TRIGGERED_OLD_TRIGGERED);
+            }
+            m_uiIciclesTimer = urand(3000, 5000);
+        }
+        else
+            m_uiIciclesTimer -= uiDiff;
     }
-
-    return false;
 }
 
-void AddSC_pit_of_saron()
+InstanceData* GetInstanceData_instance_pit_of_saron(Map* pMap)
+{
+    return new instance_pit_of_saron(pMap);
+}
+
+void AddSC_instance_pit_of_saron()
 {
     Script* pNewScript = new Script;
-    pNewScript->Name = "npc_ymirjar_deathbringer";
-    pNewScript->GetAI = &GetAI_npc_ymirjar_deathbringer;
-    pNewScript->pEffectDummyNPC = &EffectDummyCreature_spell_summon_undead;
-    pNewScript->RegisterSelf();
-
-    pNewScript = new Script;
-    pNewScript->Name = "npc_collapsing_icicle";
-    pNewScript->GetAI = &GetAI_npc_collapsing_icicle;
-    pNewScript->RegisterSelf();
-
-    pNewScript = new Script;
-    pNewScript->Name = "at_pit_of_saron";
-    pNewScript->pAreaTrigger = &AreaTrigger_at_pit_of_saron;
+    pNewScript->Name = "instance_pit_of_saron";
+    pNewScript->GetInstanceData = &GetInstanceData_instance_pit_of_saron;
     pNewScript->RegisterSelf();
 }

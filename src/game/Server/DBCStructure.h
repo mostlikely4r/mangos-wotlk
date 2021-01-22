@@ -1450,7 +1450,7 @@ struct MapEntry
     uint32  MapID;                                          // 0        m_ID
     // char*       internalname;                            // 1        m_Directory
     uint32  map_type;                                       // 2        m_InstanceType
-    // uint32 mapFlags;                                     // 3        m_Flags (0x100 - CAN_CHANGE_PLAYER_DIFFICULTY)
+    uint32  Flags;                                          // 3        m_Flags (0x100 - CAN_CHANGE_PLAYER_DIFFICULTY)
     // uint32 isPvP;                                        // 4        m_PVP 0 or 1 for battlegrounds (not arenas)
     char*   name[16];                                       // 5-20     m_MapName_lang
     // 21 string flags
@@ -1484,6 +1484,8 @@ struct MapEntry
     {
         return MapID == 0 || MapID == 1 || MapID == 530 || MapID == 571;
     }
+
+    bool IsDynamicDifficultyMap() const { return (Flags & MAP_FLAG_DYNAMIC_DIFFICULTY) != 0; }
 };
 
 struct MapDifficultyEntry
@@ -2197,22 +2199,24 @@ struct TotemCategoryEntry
 
 struct TransportAnimationEntry
 {
-    // uint32 id;                                           // 0        // m_id
-    uint32 transportId;                                     // 1        // m_transportId (matched with gameobjects type 11 and 15)
-    uint32 timeIndex;                                       // 2        // m_timeIndex
-    DBCPosition3D pos;                                      // 3 - 5    // m_position
-    // uint32 animationDataId;                              // 6
+    uint32 id;                                              // 0        // m_id
+    uint32 TransportEntry;                                  // 1        // m_transportId (matched with gameobjects type 11 and 15)
+    uint32 TimeSeg;                                         // 2        // m_timeIndex
+    float   X;                                              // 3        // m_x
+    float   Y;                                              // 4        // m_y
+    float   Z;                                              // 5        // m_z
+    // uint32  MovementId;                                  // 6
 };
 
 struct TransportRotationEntry
 {
     // uint32 id;                                           // 0        // m_id
-    uint32 transportId;                                     // 1        // m_transportId (matched with gameobjects type 11 and 15)
-    uint32 timeIndex;                                       // 2        // m_timeIndex
+    uint32 TransportEntry;                                  // 1        // m_transportId (matched with gameobjects type 11 and 15)
+    uint32 TimeSeg;                                         // 2        // m_timeIndex
     float x;                                                // 3        // m_x
     float y;                                                // 4        // m_y
     float z;                                                // 5        // m_z
-    float o;                                                // 6        // m_o
+    float w;                                                // 6        // m_o
 };
 
 #define MAX_VEHICLE_SEAT 8
@@ -2312,6 +2316,18 @@ struct VehicleSeatEntry
     // 55       m_cameraEnteringZoom"
     // 56       m_cameraSeatZoomMin
     // 57       m_cameraSeatZoomMax
+
+    inline bool HasFlag(VehicleSeatFlags flag) const { return (m_flags & flag) != 0; }
+    inline bool HasFlag(VehicleSeatFlagsB flag) const { return (m_flagsB & flag) != 0; }
+
+    inline bool CanEnterOrExit() const { return HasFlag(VehicleSeatFlags(SEAT_FLAG_CAN_EXIT | SEAT_FLAG_CAN_CONTROL | SEAT_FLAG_SHOULD_USE_VEH_SEAT_EXIT_ANIM_ON_FORCED_EXIT)); }
+    inline bool CanSwitchFromSeat() const { return HasFlag(SEAT_FLAG_CAN_SWITCH); }
+    inline bool IsUsableByOverride() const {
+        return HasFlag(VehicleSeatFlags(SEAT_FLAG_UNCONTROLLED | SEAT_FLAG_UNK15))
+            || HasFlag(VehicleSeatFlagsB(SEAT_FLAG_B_USABLE_FORCED | SEAT_FLAG_B_USABLE_FORCED_2 |
+                SEAT_FLAG_B_USABLE_FORCED_3 | SEAT_FLAG_B_USABLE_FORCED_4));
+    }
+    inline bool IsEjectable() const { return HasFlag(SEAT_FLAG_B_EJECTABLE); }
 };
 
 struct WMOAreaTableEntry
@@ -2424,7 +2440,7 @@ struct TaxiPathBySourceAndDestination
 typedef std::map<uint32, TaxiPathBySourceAndDestination> TaxiPathSetForSource;
 typedef std::map<uint32, TaxiPathSetForSource> TaxiPathSetBySource;
 
-typedef std::vector<TaxiPathNodeEntry const*> TaxiPathNodeList;
+typedef Path<TaxiPathNodeEntry const*> TaxiPathNodeList;
 typedef std::vector<TaxiPathNodeList> TaxiPathNodesByPath;
 
 #define TaxiMaskSize 14

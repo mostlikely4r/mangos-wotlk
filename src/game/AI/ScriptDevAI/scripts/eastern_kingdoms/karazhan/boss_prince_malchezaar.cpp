@@ -236,6 +236,7 @@ struct boss_malchezaarAI : public CombatAI
                         ResetCombatAction(MALCHEZAAR_INFERNAL, 15000);
                         ResetCombatAction(MALCHEZAAR_SHADOW_WORD_PAIN, 5000);
                         m_creature->SetCanParry(false);
+                        SetActionReadyStatus(action, false);
                     }
                 }
                 return;
@@ -318,6 +319,9 @@ struct Enfeeble : public SpellScript, public AuraScript
 
     void OnApply(Aura* aura, bool apply) const override
     {
+        if (aura->GetEffIndex() != EFFECT_INDEX_0)
+            return;
+
         if (apply)
         {
             if (Unit* caster = aura->GetCaster())

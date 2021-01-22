@@ -1262,6 +1262,9 @@ GroupJoinBattlegroundResult Group::CanJoinBattleGroundQueue(BattleGround const* 
         // check if member can join any more battleground queues
         if (!member->HasFreeBattleGroundQueueId())
             return ERR_BATTLEGROUND_TOO_MANY_QUEUES;        // not blizz-like
+        // do not allow joining queue if member still in arena
+        if (member->InArena())
+            return ERR_BATTLEGROUND_JOIN_FAILED;
     }
     return GroupJoinBattlegroundResult(bgOrTemplate->GetTypeId());
 }
@@ -1286,7 +1289,7 @@ void Group::SetRaidDifficulty(Difficulty difficulty)
 {
     m_raidDifficulty = difficulty;
     if (!isBattleGroup())
-        CharacterDatabase.PExecute("UPDATE groups SET raiddifficulty = %u WHERE groupId='%u'", m_raidDifficulty, m_Id);
+        CharacterDatabase.PExecute("UPDATE `groups` SET raiddifficulty = %u WHERE groupId='%u'", m_raidDifficulty, m_Id);
 
     for (GroupReference* itr = GetFirstMember(); itr != nullptr; itr = itr->next())
     {
@@ -1508,7 +1511,7 @@ void Group::UnbindInstance(uint32 mapid, uint8 difficulty, bool unload)
 
 void Group::_homebindIfInstance(Player* player) const
 {
-    if (player && !player->isGameMaster())
+    if (player && !player->IsGameMaster())
     {
         Map* map = player->GetMap();
         if (map->IsDungeon())
@@ -1526,7 +1529,12 @@ static void RewardGroupAtKill_helper(Player* pGroupGuy, Unit* pVictim, uint32 co
 {
     // honor can be in PvP and !PvP (racial leader) cases (for alive)
     if (pGroupGuy->IsAlive())
+    {
         pGroupGuy->RewardHonor(pVictim, count);
+        // Send player killcredit for quests with PlayerSlain
+        if (pVictim->GetTypeId() == TYPEID_PLAYER)
+            pGroupGuy->KilledPlayerCredit();
+    }
 
     // xp and reputation only in !PvP case
     if (!PvP)

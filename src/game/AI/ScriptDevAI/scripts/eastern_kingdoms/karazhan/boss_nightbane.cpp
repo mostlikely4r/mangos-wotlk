@@ -86,7 +86,7 @@ struct boss_nightbaneAI : public CombatAI
     {
         AddCombatAction(NIGHTBANE_PHASE_RESET, true);
         AddTimerlessCombatAction(NIGHTBANE_PHASE_2, true);
-        AddCombatAction(NIGHTBANE_BELLOWING_ROAR, 30000, 45000);
+        AddCombatAction(NIGHTBANE_BELLOWING_ROAR, 55000, 60000);
         AddCombatAction(NIGHTBANE_CHARRED_EARTH, 10000, 15000);
         AddCombatAction(NIGHTBANE_SMOLDERING_BREATH, 9000, 13000);
         AddCombatAction(NIGHTBANE_TAIL_SWEEP, 12000, 15000);
@@ -125,14 +125,14 @@ struct boss_nightbaneAI : public CombatAI
         SetDeathPrevention(false);
         m_creature->SetSupportThreatOnly(false);
         SetCombatScriptStatus(false);
+        SetMeleeEnabled(true);
 
         m_skeletons.clear();
     }
 
     void StartIntro()
     {
-        m_creature->SetWalk(false);
-        m_creature->GetMotionMaster()->MoveWaypoint(0);
+        m_creature->GetMotionMaster()->MovePath(0, PATH_FROM_EXTERNAL, FORCED_MOVEMENT_RUN);
     }
 
     void Aggro(Unit* /*who*/) override
@@ -186,6 +186,8 @@ struct boss_nightbaneAI : public CombatAI
     void SummonedCreatureJustDied(Creature* summoned) override
     {
         m_skeletons.erase(std::remove(m_skeletons.begin(), m_skeletons.end(), summoned->GetObjectGuid()), m_skeletons.end());
+        if (m_skeletons.empty() && m_phase == PHASE_AIR && !m_creature->HasAura(SPELL_RAIN_OF_BONES))
+            ResetCombatAction(NIGHTBANE_PHASE_RESET, 1000);
     }
 
     void MovementInform(uint32 motionType, uint32 pointId) override
@@ -230,6 +232,8 @@ struct boss_nightbaneAI : public CombatAI
             {
                 case POINT_ID_AIR:
                     m_phase = PHASE_AIR;
+                    SetCombatScriptStatus(false);
+                    HandlePhaseTransition();
                     break;
                 case POINT_ID_GROUND:
                     // TODO: remove this once MMAPs are more reliable in the area
@@ -243,8 +247,6 @@ struct boss_nightbaneAI : public CombatAI
                     ResetTimer(NIGHTBANE_ATTACK_DELAY, 2000);
                     break;
             }
-            SetCombatScriptStatus(false);
-            HandlePhaseTransition();
         }
     }
 
@@ -252,7 +254,9 @@ struct boss_nightbaneAI : public CombatAI
     {
         m_creature->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PLAYER);
         m_creature->SetInCombatWithZone();
+        SetCombatScriptStatus(false);
         AttackClosestEnemy();
+        HandlePhaseTransition();
     }
 
     // Wrapper to handle movement to the closest trigger
@@ -327,8 +331,7 @@ struct boss_nightbaneAI : public CombatAI
             case NIGHTBANE_PHASE_RESET:
             {
                 DoScriptText(urand(0, 1) ? SAY_LAND_PHASE_1 : SAY_LAND_PHASE_2, m_creature);
-                auto wpPath = sWaypointMgr.GetPathFromOrigin(m_creature->GetEntry(), m_creature->GetGUIDLow(), 1, PATH_FROM_ENTRY);
-                m_creature->GetMotionMaster()->MovePath(*wpPath);
+                m_creature->GetMotionMaster()->MovePath(1, PATH_FROM_ENTRY, FORCED_MOVEMENT_WALK);
                 m_phase = PHASE_TRANSITION;
                 SetCombatScriptStatus(true);
                 DisableCombatAction(action);
@@ -361,7 +364,11 @@ struct boss_nightbaneAI : public CombatAI
             case NIGHTBANE_BELLOWING_ROAR:
             {
                 if (DoCastSpellIfCan(nullptr, SPELL_BELLOWING_ROAR) == CAST_OK)
+#ifdef PRENERF_2_0_3
                     ResetCombatAction(action, urand(30000, 45000));
+#else
+                    ResetCombatAction(action, urand(38000, 48000));
+#endif
                 break;
             }
             case NIGHTBANE_CHARRED_EARTH:
@@ -417,7 +424,7 @@ struct boss_nightbaneAI : public CombatAI
             case NIGHTBANE_FIREBALL_BARRAGE:
             {
                 if (Unit* target = m_creature->SelectAttackingTarget(ATTACKING_TARGET_FARTHEST_AWAY, 0, SPELL_FIREBALL_BARRAGE, SELECT_FLAG_PLAYER))
-                    if (target->IsWithinDist(m_creature, 60.f) || m_creature->CastSpell(m_creature->GetVictim(), SPELL_FIREBALL_BARRAGE, TRIGGERED_NONE) == SPELL_CAST_OK)
+                    if (m_creature->GetDistance(target, false, DIST_CALC_COMBAT_REACH) < 60.f || (m_creature->CastSpell(m_creature->GetVictim(), SPELL_FIREBALL_BARRAGE, TRIGGERED_NONE) == SPELL_CAST_OK))
                         ResetCombatAction(action, urand(3000, 6000)); // if farthest target is 40+ yd away
                 break;
             }

@@ -50,6 +50,7 @@
 #include "MotionGenerators/MoveMap.h"                       // for mmap manager
 #include "MotionGenerators/PathFinder.h"                    // for mmap commands
 #include "Movement/MoveSplineInit.h"
+#include "Entities/Transports.h"
 
 #include <fstream>
 #include <map>
@@ -556,6 +557,7 @@ bool ChatHandler::HandleGoCreatureCommand(char* args)
             if (!dataPair)
                 break;
 
+            dbGuid = dataPair->first;
             data = &dataPair->second;
             break;
         }
@@ -1018,7 +1020,7 @@ bool ChatHandler::HandleGameObjectTurnCommand(char* args)
     if (!ExtractFloat(&args, z_rot) || !ExtractOptFloat(&args, y_rot, 0) || !ExtractOptFloat(&args, x_rot, 0))
         return false;
 
-    obj->SetWorldRotationAngles(z_rot, y_rot, x_rot);
+    obj->SetLocalRotationAngles(z_rot, y_rot, x_rot);
     obj->SaveToDB();
     PSendSysMessage(LANG_COMMAND_TURNOBJMESSAGE, obj->GetGUIDLow(), obj->GetGOInfo()->name, obj->GetGUIDLow());
     return true;
@@ -1144,7 +1146,7 @@ bool ChatHandler::HandleGameObjectAddCommand(char* args)
         return false;
     }
 
-    GameObject* pGameObj = new GameObject;
+    GameObject* pGameObj = GameObject::CreateGameObject(gInfo->id);
     QuaternionData data(0.f, 0.f, sin(o / 2), cos(o / 2));
     if (!pGameObj->Create(db_lowGUID, gInfo->id, map, plr->GetPhaseMaskForSpawn(), x, y, z, o, data))
     {
@@ -1159,7 +1161,7 @@ bool ChatHandler::HandleGameObjectAddCommand(char* args)
     pGameObj->SaveToDB(map->GetId(), (1 << map->GetSpawnMode()), plr->GetPhaseMaskForSpawn());
 
     // this will generate a new guid if the object is in an instance
-    if (!pGameObj->LoadFromDB(db_lowGUID, map))
+    if (!pGameObj->LoadFromDB(db_lowGUID, map, db_lowGUID))
     {
         delete pGameObj;
         return false;
@@ -1286,7 +1288,8 @@ bool ChatHandler::HandleGameObjectRespawnCommand(char* args)
     return true;
 }
 
-bool ChatHandler::HandleGameObjectActivateCommand(char* args) {
+bool ChatHandler::HandleGameObjectActivateCommand(char* args)
+{
     // number or [name] Shift-click form |color|Hgameobject:go_id|h[name]|h|r
     uint32 lowguid;
     if (!ExtractUint32KeyFromLink(&args, "Hgameobject", lowguid))
@@ -1314,6 +1317,35 @@ bool ChatHandler::HandleGameObjectActivateCommand(char* args) {
     obj->UseDoorOrButton(autoCloseTime, false);
 
     PSendSysMessage("GameObject entry: %u guid: %u activated!", obj->GetEntry(), lowguid);
+    return true;
+}
+
+bool ChatHandler::HandleGameObjectForcedDespawnCommand(char* args)
+{
+    uint32 lowguid;
+    if (!ExtractUint32KeyFromLink(&args, "Hgameobject", lowguid))
+        return false;
+
+    if (!lowguid)
+        return false;
+
+    GameObject* obj = nullptr;
+
+    // by DB guid
+    if (GameObjectData const* go_data = sObjectMgr.GetGOData(lowguid))
+        obj = GetGameObjectWithGuid(lowguid, go_data->id);
+
+    if (!obj)
+    {
+        PSendSysMessage(LANG_COMMAND_OBJNOTFOUND, lowguid);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    obj->SetLootState(GO_JUST_DEACTIVATED);
+    obj->SetRespawnDelay(10000);
+    obj->SetForcedDespawn();
+
     return true;
 }
 
@@ -1350,16 +1382,16 @@ bool ChatHandler::HandleGameObjectNearSpawnedCommand(char* args)
 
 bool ChatHandler::HandleGUIDCommand(char* /*args*/)
 {
-    ObjectGuid guid = m_session->GetPlayer()->GetSelectionGuid();
+    Creature* creature = getSelectedCreature();
 
-    if (!guid)
+    if (!creature)
     {
         SendSysMessage(LANG_NO_SELECTION);
         SetSentErrorMessage(true);
         return false;
     }
 
-    PSendSysMessage(LANG_OBJECT_GUID, guid.GetString().c_str());
+    PSendSysMessage(LANG_OBJECT_GUID, (creature->GetObjectGuid().GetString() + " DBGuid: " + std::to_string(creature->GetDbGuid())).c_str());
     return true;
 }
 
@@ -1734,7 +1766,31 @@ bool ChatHandler::HandleNpcAddCommand(char* args)
     uint32 db_guid = pCreature->GetGUIDLow();
 
     // To call _LoadGoods(); _LoadQuests(); CreateTrainerSpells();
-    pCreature->LoadFromDB(db_guid, map);
+    pCreature->LoadFromDB(db_guid, map, db_guid);
+    return true;
+}
+
+bool ChatHandler::HandleNpcTempSpawn(char* args)
+{
+    Player* player = GetSession()->GetPlayer();
+
+    uint32 entry;
+    if (!ExtractUInt32(&args, entry))
+    {
+        SendSysMessage("Enter proper creature entry.");
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    uint32 timer;
+    if (!ExtractUInt32(&args, timer))
+    {
+        SendSysMessage("Enter timer for despawn.");
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    player->SummonCreature(entry, player->GetPositionX(), player->GetPositionY(), player->GetPositionZ(), player->GetOrientation(), TEMPSPAWN_TIMED_OOC_DESPAWN, timer);
     return true;
 }
 
@@ -2723,23 +2779,20 @@ bool ChatHandler::HandlePInfoCommand(char* args)
 /// Helper function
 inline Creature* Helper_CreateWaypointFor(Creature* wpOwner, WaypointPathOrigin wpOrigin, int32 pathId, uint32 wpId, WaypointNode const* wpNode, CreatureInfo const* waypointInfo)
 {
-    TemporarySpawnWaypoint* wpCreature = new TemporarySpawnWaypoint(wpOwner->GetObjectGuid(), wpId, pathId, (uint32)wpOrigin);
+    TempSpawnSettings settings;
+    settings.spawner = wpOwner;
+    settings.entry = VISUAL_WAYPOINT;
+    settings.x = wpNode->x; settings.y = wpNode->y; settings.z = wpNode->z; settings.ori = wpNode->orientation;
+    settings.activeObject = true;
+    settings.despawnTime = 5 * MINUTE * IN_MILLISECONDS;
 
-    CreatureCreatePos pos(wpOwner->GetMap(), wpNode->x, wpNode->y, wpNode->z, wpNode->orientation, wpOwner->GetPhaseMask());
+    settings.tempSpawnMovegen = true;
+    settings.waypointId = wpId;
+    settings.spawnPathId = pathId;
+    settings.pathOrigin = uint32(wpOrigin);
 
-    if (!wpCreature->Create(wpOwner->GetMap()->GenerateLocalLowGuid(HIGHGUID_UNIT), pos, waypointInfo))
-    {
-        delete wpCreature;
-        return nullptr;
-    }
+    Creature* wpCreature = WorldObject::SummonCreature(settings, wpOwner->GetMap(), wpOwner->GetPhaseMask());
 
-    wpCreature->SetVisibility(VISIBILITY_OFF);
-    wpCreature->SetRespawnCoord(pos);
-    wpCreature->SetLevel(wpId);
-
-    wpCreature->SetActiveObjectState(true);
-
-    wpCreature->Summon(TEMPSPAWN_TIMED_DESPAWN, 5 * MINUTE * IN_MILLISECONDS); // Also initializes the AI and MMGen
     return wpCreature;
 }
 inline void UnsummonVisualWaypoints(Player const* player, ObjectGuid ownerGuid)
@@ -3904,7 +3957,7 @@ bool ChatHandler::HandleCombatStopCommand(char* args)
     return true;
 }
 
-bool ChatHandler::HandleCombatListCommand(char* args)
+bool ChatHandler::HandleCombatListCommand(char* /*args*/)
 {
     Player* player = GetSession()->GetPlayer();
     if (!player)
@@ -4832,7 +4885,7 @@ bool ChatHandler::HandleTitlesSetMaskCommand(char* args)
     return true;
 }
 
-bool ChatHandler::HandleTitlesSwapCommand(char* args)
+bool ChatHandler::HandleTitlesSwapCommand(char* /*args*/)
 {
     Player* target = getSelectedPlayer();
     if (!target)
@@ -4946,16 +4999,27 @@ bool ChatHandler::HandleTitlesCurrentCommand(char* args)
 
 bool ChatHandler::HandleMmapPathCommand(char* args)
 {
-    if (!MMAP::MMapFactory::createOrGetMMapManager()->GetNavMesh(m_session->GetPlayer()->GetMapId()))
+    Player* player = m_session->GetPlayer();
+    if (GenericTransport* transport = player->GetTransport())
     {
-        PSendSysMessage("NavMesh not loaded for current map.");
-        return true;
+        if (!MMAP::MMapFactory::createOrGetMMapManager()->GetGONavMesh(transport->GetDisplayId()))
+        {
+            PSendSysMessage("NavMesh not loaded for current map.");
+            return true;
+        }
+    }
+    else
+    {
+        if (!MMAP::MMapFactory::createOrGetMMapManager()->GetNavMesh(m_session->GetPlayer()->GetMapId()))
+        {
+            PSendSysMessage("NavMesh not loaded for current map.");
+            return true;
+        }
     }
 
     PSendSysMessage("mmap path:");
 
     // units
-    Player* player = m_session->GetPlayer();
     Unit* target = getSelectedUnit();
     if (!player || !target)
     {
@@ -5024,7 +5088,7 @@ bool ChatHandler::HandleMmapPathCommand(char* args)
     PSendSysMessage("end        (%.3f, %.3f, %.3f)", end.x, end.y, end.z);
     PSendSysMessage("actual end (%.3f, %.3f, %.3f)", actualEnd.x, actualEnd.y, actualEnd.z);
 
-    if (!player->isGameMaster())
+    if (!player->IsGameMaster())
         PSendSysMessage("Enable GM mode to see the path points.");
 
     for (auto& i : pointPath)
@@ -5169,7 +5233,7 @@ bool ChatHandler::HandleMmapStatsCommand(char* /*args*/)
     return true;
 }
 
-bool ChatHandler::HandleBagsCommand(char* args)
+bool ChatHandler::HandleBagsCommand(char* /*args*/)
 {
     Player* player = GetSession()->GetPlayer();
 
@@ -5190,7 +5254,7 @@ bool ChatHandler::HandleBagsCommand(char* args)
     return true;
 }
 
-bool ChatHandler::HandleBattlegroundStartCommand(char* args)
+bool ChatHandler::HandleBattlegroundStartCommand(char* /*args*/)
 {
     Player* player = m_session->GetPlayer();
 
@@ -5211,7 +5275,7 @@ bool ChatHandler::HandleBattlegroundStartCommand(char* args)
     return true;
 }
 
-bool ChatHandler::HandleBattlegroundStopCommand(char* args)
+bool ChatHandler::HandleBattlegroundStopCommand(char* /*args*/)
 {
     Player* player = m_session->GetPlayer();
 

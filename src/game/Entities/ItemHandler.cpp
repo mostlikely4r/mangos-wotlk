@@ -774,7 +774,7 @@ void WorldSession::SendListInventory(ObjectGuid vendorguid) const
             ItemPrototype const* pProto = ObjectMgr::GetItemPrototype(itemId);
             if (pProto)
             {
-                if (!_player->isGameMaster())
+                if (!_player->IsGameMaster())
                 {
                     // class wrong item skip only for bindable case
                     if ((pProto->AllowableClass & _player->getClassMask()) == 0 && pProto->Bonding == BIND_WHEN_PICKED_UP)
@@ -1411,6 +1411,8 @@ void WorldSession::HandleSocketOpcode(WorldPacket& recv_data)
     }
 
     _player->ToggleMetaGemsActive(slot, true);              // turn on all metagems (except for target item)
+
+    itemTarget->SendUpdateSockets();
 }
 
 void WorldSession::HandleCancelTempEnchantmentOpcode(WorldPacket& recv_data)

@@ -222,9 +222,11 @@ struct boss_netherspiteAI : public CombatAI
         {            
             if (DoCastSpellIfCan(m_creature, SPELL_SHADOWFORM, CAST_TRIGGERED) == CAST_OK)
             {
-                m_creature->FixateTarget(nullptr);
                 m_creature->RemoveAurasDueToSpell(SPELL_EMPOWERMENT);
+#ifdef PRENERF_2_0_3
+#else
                 m_creature->RemoveAurasDueToSpell(SPELL_NETHERBURN);
+#endif
                 DoCastSpellIfCan(m_creature, SPELL_NETHERSPITE_ROAR);
 
                 SetCombatMovement(false);
@@ -245,11 +247,15 @@ struct boss_netherspiteAI : public CombatAI
         }
         else
         {
+#ifdef PRENERF_2_0_3
+#else
             DoCastSpellIfCan(m_creature, SPELL_NETHERBURN, CAST_TRIGGERED);
+#endif
             m_creature->RemoveAurasDueToSpell(SPELL_SHADOWFORM);
             DoCastSpellIfCan(m_creature, SPELL_NETHERSPITE_ROAR);
             SetCombatMovement(true);
             SetMeleeEnabled(true);
+            m_creature->FixateTarget(nullptr);
 
             if (m_creature->GetVictim())
             {
@@ -340,18 +346,15 @@ struct boss_netherspiteAI : public CombatAI
             case NETHERSPITE_NETHERBREATH:
             {
                 if (Unit* target = m_creature->SelectAttackingTarget(ATTACKING_TARGET_RANDOM, 0, SPELL_NETHERBREATH, SELECT_FLAG_PLAYER))
-                {
-                    m_creature->SetInFront(target);
                     if (DoCastSpellIfCan(target, SPELL_NETHERBREATH) == CAST_OK)
-                        ResetCombatAction(action, 4000);
-                }
+                        ResetCombatAction(action, 6000);
                 break;
             }
             case NETHERSPITE_DUMMY_NUKE:
             {
                 if (Unit* target = m_creature->SelectAttackingTarget(ATTACKING_TARGET_RANDOM, 0, SPELL_DUMMY_NUKE, SELECT_FLAG_PLAYER))
                     if (DoCastSpellIfCan(target, SPELL_DUMMY_NUKE) == CAST_OK)
-                        ResetCombatAction(action, 4000);
+                        ResetCombatAction(action, 2000);
                 break;
             }
         }

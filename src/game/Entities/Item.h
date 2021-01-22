@@ -344,6 +344,8 @@ class Item : public Object
         std::string const& GetText() const { return m_text; }
         void SetText(std::string const& text) { m_text = text; }
 
+        void SendUpdateSockets();
+
         void SendTimeUpdate(Player* owner) const;
         void UpdateDuration(Player* owner, uint32 diff);
 
@@ -379,6 +381,9 @@ class Item : public Object
         void AddToClientUpdateList() override;
         void RemoveFromClientUpdateList() override;
         void BuildUpdateData(UpdateDataMapType& update_players) override;
+
+        bool IsUsedInSpell() const { return m_usedInSpell; }
+        void SetUsedInSpell(bool state) { m_usedInSpell = state; }
     private:
         std::string m_text;
         uint8 m_slot;
@@ -387,6 +392,7 @@ class Item : public Object
         int16 uQueuePos;
         bool mb_in_trade;                                   // true if item is currently in trade-window
         ItemLootUpdateState m_lootState;
+        bool m_usedInSpell;
 };
 
 #endif

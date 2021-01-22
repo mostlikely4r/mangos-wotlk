@@ -329,6 +329,50 @@ struct go_scrying_orb : public GameObjectAI
     }
 };
 
+/*######
+## spell_twisting_blade
+######*/
+
+struct TwistingBlade : public SpellScript
+{
+    SpellCastResult OnCheckCast(Spell* spell, bool strict) const override
+    {
+        Unit* target = spell->m_targets.getUnitTarget();
+        if (target->GetEntry() != 26316 && target->GetEntry() != 26575 && target->GetEntry() != 26577 && target->GetEntry() != 26578)
+            return SPELL_FAILED_BAD_TARGETS;
+
+        return SPELL_CAST_OK;
+    }
+};
+
+/*######
+## spell_ley_line_focus_item
+######*/
+
+struct spell_ley_line_focus_item : public AuraScript
+{
+    void OnPeriodicTrigger(Aura* aura, PeriodicTriggerData& data) const override
+    {
+        data.caster = aura->GetCaster();
+        data.target = nullptr;
+    }
+};
+
+struct spell_ley_line_focus_item_trigger : public SpellScript
+{
+    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const override
+    {
+        Unit* target = spell->GetUnitTarget();
+        Unit* caster = spell->GetCaster();
+        switch (spell->m_spellInfo->Id)
+        {
+            case 50546: target->CastSpell(caster, 47390, TRIGGERED_OLD_TRIGGERED); break;
+            case 50547: target->CastSpell(caster, 47472, TRIGGERED_OLD_TRIGGERED); break;
+            case 50548: target->CastSpell(caster, 47635, TRIGGERED_OLD_TRIGGERED); break;
+        }
+    }
+};
+
 void AddSC_dragonblight()
 {
     Script* pNewScript = new Script;
@@ -341,16 +385,19 @@ void AddSC_dragonblight()
     pNewScript->pNpcSpellClick = &NpcSpellClick_npc_crystalline_ice_giant;
     pNewScript->RegisterSelf();
 
+    pNewScript = new Script;
+    pNewScript->Name = "go_scrying_orb";
+    pNewScript->GetGameObjectAI = &GetNewAIInstance<go_scrying_orb>;
+    pNewScript->RegisterSelf();
+
     RegisterSpellScript<TaunkaFaceMeSpellScript>("spell_taunka_face_me");
     RegisterSpellScript<CaptureJormungarSpawnSpellScript>("spell_capture_jormungar_spawn");
     RegisterSpellScript<ScrapeCorrosiveSpit>("spell_scrape_corrosive_spit");
     RegisterSpellScript<ContainerOfRatsSpellScript>("spell_container_of_rats");
     RegisterSpellScript<DropOffVillager>("spell_drop_off_villager");
+    RegisterSpellScript<TwistingBlade>("spell_twisting_blade");
     RegisterAuraScript<ArmyOfTheDead>("spell_army_of_the_dead");
     RegisterSpellScript<CorrosiveSpit>("spell_corrosive_spit");
-
-    pNewScript = new Script;
-    pNewScript->Name = "go_scrying_orb";
-    pNewScript->GetGameObjectAI = &GetNewAIInstance<go_scrying_orb>;
-    pNewScript->RegisterSelf();
+    RegisterAuraScript<spell_ley_line_focus_item>("spell_ley_line_focus_ring");
+    RegisterSpellScript<spell_ley_line_focus_item_trigger>("spell_ley_line_focus_item_trigger");
 }

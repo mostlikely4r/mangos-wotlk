@@ -33,7 +33,7 @@ struct UnstableAffliction : public AuraScript
         damage *= 9;
 
         // backfire damage and silence - confirmed to have original caster
-        dispeller->CastCustomSpell(dispeller, 31117, &damage, nullptr, nullptr, TRIGGERED_OLD_TRIGGERED, nullptr, nullptr, holder->GetCasterGuid());
+        dispeller->CastCustomSpell(dispeller, SPELL_UNSTABLE_AFFLICTION_SILENCE, &damage, nullptr, nullptr, TRIGGERED_OLD_TRIGGERED, nullptr, nullptr, holder->GetCasterGuid());
     }
 };
 
@@ -111,7 +111,7 @@ struct LifeTap : public SpellScript
             if (itr->GetSpellProto()->SpellFamilyName == SPELLFAMILY_WARLOCK && itr->GetSpellProto()->SpellIconID == 1982)
                 manaFeedVal += itr->GetModifier()->m_amount;
         }
-        if (manaFeedVal > 0)
+        if (manaFeedVal > 0 && caster->GetPet())
         {
             manaFeedVal = manaFeedVal * mana / 100;
             caster->CastCustomSpell(nullptr, 32553, &manaFeedVal, nullptr, nullptr, TRIGGERED_OLD_TRIGGERED, nullptr);

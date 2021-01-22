@@ -65,6 +65,13 @@ Map::~Map()
 
     delete m_weatherSystem;
     m_weatherSystem = nullptr;
+
+    for (auto transport : m_transports)
+    {
+        transport->Object::RemoveFromWorld();
+        transport->ResetMap();
+        delete transport;
+    }
 }
 
 uint32 Map::GetCurrentMSTime() const
@@ -82,6 +89,56 @@ uint32 Map::GetCurrentDiff() const
     return World::GetCurrentDiff();
 }
 
+GenericTransport* Map::GetTransport(ObjectGuid guid)
+{
+    // elevators also cause the client to send MOVEFLAG_ONTRANSPORT - just unmount if the guid can be found in the transport list
+    for (auto& transport : m_transports)
+    {
+        if (transport->GetObjectGuid() == guid)
+        {
+            return transport;
+        }
+    }
+    if (guid.GetEntry())
+        if (GameObject* go = GetGameObject(guid))
+            if (go->IsTransport())
+                return static_cast<GenericTransport*>(go);
+    return nullptr;
+}
+
+void Map::AddTransport(Transport* transport)
+{
+    m_transports.insert(transport);
+}
+
+void Map::RemoveTransport(Transport* transport)
+{
+    if (m_transportsIterator != m_transports.end())
+    {
+        auto itr = m_transports.find(transport);
+        if (itr == m_transportsIterator)
+            ++m_transportsIterator;
+        m_transports.erase(transport);
+    }
+    else
+        m_transports.erase(transport);
+}
+
+bool Map::CanSpawn(TypeID typeId, uint32 dbGuid)
+{
+    if (typeId == TYPEID_UNIT)
+        return GetCreatureLinkingHolder()->CanSpawn(dbGuid, this, nullptr, 0.f, 0.f);
+    else if (TYPEID_GAMEOBJECT)
+    {
+        GameObjectData const* data = sObjectMgr.GetGOData(dbGuid);
+        if (data)
+            if ((data->spawnMask & (1 << GetDifficulty())) == 0)
+                return false;
+        return true;
+    }
+    return false;
+}
+
 void Map::LoadMapAndVMap(int gx, int gy)
 {
     if (m_bLoadedGrids[gx][gy])
@@ -97,7 +154,7 @@ Map::Map(uint32 id, time_t expiry, uint32 InstanceId, uint8 SpawnMode)
       m_VisibleDistance(DEFAULT_VISIBILITY_DISTANCE), m_persistentState(nullptr),
       m_activeNonPlayersIter(m_activeNonPlayers.end()), m_onEventNotifiedIter(m_onEventNotifiedObjects.end()),
       i_gridExpiry(expiry), m_TerrainData(sTerrainMgr.LoadTerrain(id)),
-      i_data(nullptr), i_script_id(0), i_defaultLight(GetDefaultMapLight(id))
+      i_data(nullptr), i_script_id(0), m_transportsIterator(m_transports.begin()), i_defaultLight(GetDefaultMapLight(id))
 {
     m_weatherSystem = new WeatherSystem(this);
 }
@@ -130,6 +187,8 @@ void Map::Initialize(bool loadInstanceData /*= true*/)
     m_persistentState->InitPools();
 
     sObjectMgr.LoadActiveEntities(this);
+
+    LoadTransports();
 }
 
 void Map::InitVisibilityDistance()
@@ -143,6 +202,13 @@ template<class T>
 void Map::AddToGrid(T* obj, NGridType* grid, Cell const& cell)
 {
     (*grid)(cell.CellX(), cell.CellY()).AddGridObject<T>(obj);
+}
+
+template<>
+void Map::AddToGrid(GameObject* obj, NGridType* grid, Cell const& cell)
+{
+    (*grid)(cell.CellX(), cell.CellY()).AddGridObject<GameObject>(obj);
+    obj->SetCurrentCell(cell);
 }
 
 template<>
@@ -601,17 +667,45 @@ void Map::Update(const uint32& t_diff)
 
     GetMessager().Execute(this);
 
-    /// update worldsessions for existing players
-    for (m_mapRefIter = m_mapRefManager.begin(); m_mapRefIter != m_mapRefManager.end(); ++m_mapRefIter)
-    {
-        Player* plr = m_mapRefIter->getSource();
-        if (plr && plr->IsInWorld())
-        {
-            WorldSession* pSession = plr->GetSession();
-            MapSessionFilter updater(pSession);
+    /// update active cells around players and active objects
+    resetMarkedCells();
 
-            pSession->Update(updater);
+    WorldObjectUnSet objToUpdate;
+    MaNGOS::ObjectUpdater obj_updater(objToUpdate, t_diff);
+    TypeContainerVisitor<MaNGOS::ObjectUpdater, GridTypeMapContainer  > grid_object_update(obj_updater);    // For creature
+    TypeContainerVisitor<MaNGOS::ObjectUpdater, WorldTypeMapContainer > world_object_update(obj_updater);   // For pets
+
+    for (m_transportsIterator = m_transports.begin(); m_transportsIterator != m_transports.end();)
+    {
+        Transport* transport = *m_transportsIterator;
+        ++m_transportsIterator;
+        transport->Update(t_diff);
+    }
+
+    // the player iterator is stored in the map object
+    // to make sure calls to Map::Remove don't invalidate it
+    {
+        uint32 updatedSessions = 0;
+
+        metric::duration<std::chrono::milliseconds> sessions_meas("map.update.session", {
+            { "map_id", std::to_string(i_id) },
+            { "instance_id", std::to_string(i_InstanceId) },
+            });
+
+        for (m_mapRefIter = m_mapRefManager.begin(); m_mapRefIter != m_mapRefManager.end(); ++m_mapRefIter)
+        {
+            Player* player = m_mapRefIter->getSource();
+            if (!player || !player->IsInWorld())
+                continue;
+
+            // Update session first
+            WorldSession* pSession = player->GetSession();
+            pSession->UpdateMap(t_diff);
+
+            ++updatedSessions;
         }
+
+        sessions_meas.add_field("count", std::to_string(static_cast<int32>(updatedSessions)));
     }
 
     /// update players at tick
@@ -622,16 +716,6 @@ void Map::Update(const uint32& t_diff)
             plr->Update(t_diff);
     }
 
-    /// update active cells around players and active objects
-    resetMarkedCells();
-
-    WorldObjectUnSet objToUpdate;
-    MaNGOS::ObjectUpdater obj_updater(objToUpdate, t_diff);
-    TypeContainerVisitor<MaNGOS::ObjectUpdater, GridTypeMapContainer  > grid_object_update(obj_updater);    // For creature
-    TypeContainerVisitor<MaNGOS::ObjectUpdater, WorldTypeMapContainer > world_object_update(obj_updater);   // For pets
-
-    // the player iterator is stored in the map object
-    // to make sure calls to Map::Remove don't invalidate it
     for (m_mapRefIter = m_mapRefManager.begin(); m_mapRefIter != m_mapRefManager.end(); ++m_mapRefIter)
     {
         Player* player = m_mapRefIter->getSource();
@@ -659,6 +743,8 @@ void Map::Update(const uint32& t_diff)
 
             if (!obj->IsInWorld() || !obj->IsPositionValid())
                 continue;
+
+            objToUpdate.insert(obj);
 
             // lets update mobs/objects in ALL visible cells around player!
             CellArea area = Cell::CalculateCellArea(obj->GetPositionX(), obj->GetPositionY(), GetVisibilityDistance());
@@ -880,6 +966,75 @@ void Map::CreatureRelocation(Creature* creature, float x, float y, float z, floa
     }
 }
 
+void Map::GameObjectRelocation(GameObject* go, float x, float y, float z, float orientation, bool respawnRelocationOnFail)
+{
+    Cell new_cell(MaNGOS::ComputeCellPair(x, y));
+    Cell old_cell = go->GetCurrentCell();
+
+    if (!respawnRelocationOnFail && !getNGrid(new_cell.GridX(), new_cell.GridY()))
+        return;
+
+    if (old_cell.DiffGrid(new_cell))
+    {
+        if (!go->isActiveObject() && !loaded(new_cell.gridPair()))
+        {
+            DEBUG_FILTER_LOG(LOG_FILTER_CREATURE_MOVES, "Creature (GUID: %u Entry: %u) attempt move from grid[%u,%u]cell[%u,%u] to unloaded grid[%u,%u]cell[%u,%u].", go->GetGUIDLow(), go->GetEntry(), old_cell.GridX(), old_cell.GridY(), old_cell.CellX(), old_cell.CellY(), new_cell.GridX(), new_cell.GridY(), new_cell.CellX(), new_cell.CellY());
+            return;
+        }
+        EnsureGridLoadedAtEnter(new_cell);
+    }
+
+    // delay creature move for grid/cell to grid/cell moves
+    if (old_cell.DiffCell(new_cell) || old_cell.DiffGrid(new_cell))
+    {
+        NGridType* oldGrid = getNGrid(old_cell.GridX(), old_cell.GridY());
+        NGridType* newGrid = getNGrid(new_cell.GridX(), new_cell.GridY());
+        RemoveFromGrid(go, oldGrid, old_cell);
+        AddToGrid(go, newGrid, new_cell);
+        go->GetViewPoint().Event_GridChanged(&(*newGrid)(new_cell.CellX(), new_cell.CellY()));
+    }
+    else
+    {
+        go->Relocate(x, y, z, orientation);
+        go->UpdateModelPosition();
+        go->UpdateObjectVisibility();
+    }
+}
+
+void Map::DynamicObjectRelocation(DynamicObject* dynObj, float x, float y, float z, float orientation)
+{
+    Cell new_cell(MaNGOS::ComputeCellPair(x, y));
+    Cell old_cell = dynObj->GetCurrentCell();
+
+    if (!getNGrid(new_cell.GridX(), new_cell.GridY()))
+        return;
+
+    if (old_cell.DiffGrid(new_cell))
+    {
+        if (!dynObj->isActiveObject() && !loaded(new_cell.gridPair()))
+        {
+            DEBUG_FILTER_LOG(LOG_FILTER_CREATURE_MOVES, "Creature (GUID: %u Entry: %u) attempt move from grid[%u,%u]cell[%u,%u] to unloaded grid[%u,%u]cell[%u,%u].", dynObj->GetGUIDLow(), dynObj->GetEntry(), old_cell.GridX(), old_cell.GridY(), old_cell.CellX(), old_cell.CellY(), new_cell.GridX(), new_cell.GridY(), new_cell.CellX(), new_cell.CellY());
+            return;
+        }
+        EnsureGridLoadedAtEnter(new_cell);
+    }
+
+    // delay creature move for grid/cell to grid/cell moves
+    if (old_cell.DiffCell(new_cell) || old_cell.DiffGrid(new_cell))
+    {
+        NGridType* oldGrid = getNGrid(old_cell.GridX(), old_cell.GridY());
+        NGridType* newGrid = getNGrid(new_cell.GridX(), new_cell.GridY());
+        RemoveFromGrid(dynObj, oldGrid, old_cell);
+        AddToGrid(dynObj, newGrid, new_cell);
+        dynObj->GetViewPoint().Event_GridChanged(&(*newGrid)(new_cell.CellX(), new_cell.CellY()));
+    }
+    else
+    {
+        dynObj->Relocate(x, y, z, orientation);
+        dynObj->UpdateObjectVisibility();
+    }
+}
+
 bool Map::CreatureCellRelocation(Creature* c, const Cell& new_cell)
 {
     Cell const& old_cell = c->GetCurrentCell();
@@ -1026,8 +1181,9 @@ void Map::SendInitSelf(Player* player) const
     UpdateData updateData;
 
     // attach to player data current transport data
-    if (Transport* transport = player->GetTransport())
+    if (GenericTransport* transport = player->GetTransport())
     {
+        player->m_clientGUIDs.insert(transport->GetObjectGuid());
         transport->BuildCreateUpdateBlockForPlayer(&updateData, player);
     }
 
@@ -1035,13 +1191,17 @@ void Map::SendInitSelf(Player* player) const
     player->BuildCreateUpdateBlockForPlayer(&updateData, player);
 
     // build other passengers at transport also (they always visible and marked as visible and will not send at visibility update at add to map
-    if (Transport* transport = player->GetTransport())
+    if (GenericTransport* transport = player->GetTransport())
     {
         for (auto itr : transport->GetPassengers())
         {
-            if (player != itr && player->HaveAtClient(itr))
+            if (player != itr)
             {
-                itr->BuildCreateUpdateBlockForPlayer(&updateData, player);
+                if (player->HaveAtClient(itr) || itr->isVisibleForInState(player, player, false))
+                {
+                    player->m_clientGUIDs.insert(itr->GetObjectGuid());
+                    itr->BuildCreateUpdateBlockForPlayer(&updateData, player);
+                }
             }
         }
     }
@@ -1056,21 +1216,18 @@ void Map::SendInitSelf(Player* player) const
 void Map::SendInitTransports(Player* player) const
 {
     // Hack to send out transports
-    MapManager::TransportMap& tmap = sMapMgr.m_TransportsByMap;
-
     // no transports at map
-    if (tmap.find(player->GetMapId()) == tmap.end())
+    if (m_transports.size() == 0)
         return;
 
     UpdateData updateData;
 
-    MapManager::TransportSet& tset = tmap[player->GetMapId()];
-
-    for (auto i : tset)
+    for (auto i : m_transports)
     {
         // send data for current transport in other place
         if (i != player->GetTransport() && i->GetMapId() == i_id)
         {
+            player->m_clientGUIDs.insert(i->GetObjectGuid());
             i->BuildCreateUpdateBlockForPlayer(&updateData, player);
         }
     }
@@ -1085,26 +1242,39 @@ void Map::SendInitTransports(Player* player) const
 void Map::SendRemoveTransports(Player* player) const
 {
     // Hack to send out transports
-    MapManager::TransportMap& tmap = sMapMgr.m_TransportsByMap;
-
     // no transports at map
-    if (tmap.find(player->GetMapId()) == tmap.end())
+    if (m_transports.size() == 0)
         return;
 
     UpdateData updateData;
 
-    MapManager::TransportSet& tset = tmap[player->GetMapId()];
-
     // except used transport
-    for (auto i : tset)
+    for (auto i : m_transports)
+    {
         if (i != player->GetTransport() && i->GetMapId() != i_id)
+        {
             i->BuildOutOfRangeUpdateBlock(&updateData);
+            player->m_clientGUIDs.erase(i->GetObjectGuid());
+        }
+    }
 
     for (size_t i = 0; i < updateData.GetPacketCount(); ++i)
     {
         WorldPacket packet = updateData.BuildPacket(i);
         player->GetSession()->SendPacket(packet);
     }
+}
+
+void Map::LoadTransports()
+{
+    uint32 mapId = GetId();
+    Team team = TEAM_NONE;
+    if (DungeonMap* dungeon = dynamic_cast<DungeonMap*>(this))
+        team = dungeon->GetInstanceTeam();
+
+    for (TransportTemplate const* transportTemplate : sMapMgr.m_transportsByMap[mapId])
+        if (Transport::IsSpawnedByDefault(transportTemplate->entry, team))
+            Transport::LoadTransport(*transportTemplate, this);
 }
 
 inline void Map::setNGrid(NGridType* grid, uint32 x, uint32 y)
@@ -1171,7 +1341,7 @@ uint32 Map::GetPlayersCountExceptGMs() const
 {
     uint32 count = 0;
     for (const auto& itr : m_mapRefManager)
-        if (!itr.getSource()->isGameMaster())
+        if (!itr.getSource()->IsGameMaster())
             ++count;
     return count;
 }
@@ -1556,9 +1726,6 @@ bool DungeonMap::Add(Player* player)
     m_unloadTimer = 0;
     m_resetAfterUnload = false;
     m_unloadWhenEmpty = false;
-
-    if (!m_team)
-        m_team = player->GetTeam();
 
     if (i_mapEntry->IsNonRaidDungeon() && GetDifficulty() == DUNGEON_DIFFICULTY_NORMAL)
         player->AddNewInstanceId(GetInstanceId());
@@ -2008,6 +2175,7 @@ WorldObject* Map::GetWorldObject(ObjectGuid guid)
     switch (guid.GetHigh())
     {
         case HIGHGUID_PLAYER:       return GetPlayer(guid);
+        case HIGHGUID_TRANSPORT:
         case HIGHGUID_GAMEOBJECT:   return GetGameObject(guid);
         case HIGHGUID_UNIT:
         case HIGHGUID_VEHICLE:      return GetCreature(guid);
@@ -2020,7 +2188,6 @@ WorldObject* Map::GetWorldObject(ObjectGuid guid)
             return corpse && corpse->IsInWorld() ? corpse : nullptr;
         }
         case HIGHGUID_MO_TRANSPORT:
-        case HIGHGUID_TRANSPORT:
         default:                    break;
     }
 
@@ -2055,6 +2222,7 @@ uint32 Map::GenerateLocalLowGuid(HighGuid guidhigh)
     {
         case HIGHGUID_UNIT:
             return m_CreatureGuids.Generate();
+        case HIGHGUID_TRANSPORT:
         case HIGHGUID_GAMEOBJECT:
             return m_GameObjectGuids.Generate();
         case HIGHGUID_DYNAMICOBJECT:
@@ -2259,9 +2427,9 @@ bool Map::GetHeightInRange(uint32 phasemask, float x, float y, float& z, float m
     return true;
 }
 
-float Map::GetHeight(uint32 phasemask, float x, float y, float z) const
+float Map::GetHeight(uint32 phasemask, float x, float y, float z, bool swim) const
 {
-    float staticHeight = m_TerrainData->GetHeightStatic(x, y, z);
+    float staticHeight = m_TerrainData->GetHeightStatic(x, y, z, true, (swim ? DEFAULT_WATER_SEARCH : DEFAULT_HEIGHT_SEARCH));
 
     // Get Dynamic Height around static Height (if valid)
     float dynSearchHeight = 2.0f + (z < staticHeight ? staticHeight : z);
@@ -2310,8 +2478,8 @@ bool Map::GetRandomPointUnderWater(uint32 phaseMask, float& x, float& y, float& 
         // Mobs underwater do not move along Z axis
         //float max_z = std::max(z + 0.7f * radius, min_z);
         //max_z = std::min(max_z, liquidLevel);
-        //x = i_x;
-        //y = i_y;
+        x = i_x;
+        y = i_y;
         //z = min_z + rand_norm_f() * (max_z - min_z);
         return true;
     }

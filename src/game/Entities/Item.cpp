@@ -282,7 +282,7 @@ void Item::UpdateDuration(Player* owner, uint32 diff)
 
     // DEBUG_LOG("Item::UpdateDuration Item (Entry: %u Duration %u Diff %u)", GetEntry(), GetUInt32Value(ITEM_FIELD_DURATION), diff);
 
-    if (GetUInt32Value(ITEM_FIELD_DURATION) <= diff)
+    if (GetUInt32Value(ITEM_FIELD_DURATION) <= diff && !IsUsedInSpell())
     {
         if (uint32 newItemId = sObjectMgr.GetItemExpireConvert(GetEntry()))
             owner->ConvertItem(this, newItemId);
@@ -1094,6 +1094,16 @@ bool Item::IsLimitedToAnotherMapOrZone(uint32 cur_mapId, uint32 cur_zoneId) cons
 {
     ItemPrototype const* proto = GetProto();
     return proto && ((proto->Map && proto->Map != cur_mapId) || (proto->Area && proto->Area != cur_zoneId));
+}
+
+void Item::SendUpdateSockets()
+{
+    WorldPacket data(SMSG_SOCKET_GEMS_RESULT, 8 + 4 + 4 + 4 + 4);
+    data << uint64(GetObjectGuid());
+    for (uint32 i = SOCK_ENCHANTMENT_SLOT; i <= BONUS_ENCHANTMENT_SLOT; ++i)
+        data << uint32(GetEnchantmentId(EnchantmentSlot(i)));
+
+    GetOwner()->SendDirectMessage(data);
 }
 
 // Though the client has the information in the item's data field,

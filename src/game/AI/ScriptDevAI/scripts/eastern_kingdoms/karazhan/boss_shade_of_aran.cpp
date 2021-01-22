@@ -23,15 +23,14 @@ EndScriptData */
 
 /* Pre-nerf Changes
 Add Dragon's Breath ability - used shortly after Flame Wreath dissipates (random target in melee range).
-
-Patches
-2.1.0 - Shade of Aran will no longer cast Dragon's Breath.
+Patch_2.1.0 - Shade of Aran will no longer cast Dragon's Breath.
 */
 
 #include "AI/ScriptDevAI/include/sc_common.h"
 #include "karazhan.h"
 #include "AI/ScriptDevAI/base/CombatAI.h"
 #include "Spells/Scripts/SpellScript.h"
+#include "Globals/ObjectMgr.h"
 
 enum
 {
@@ -105,6 +104,7 @@ enum SuperSpells
 enum AranActions // order based on priority
 {
     ARAN_ACTION_DRINK,
+    ARAN_ACTION_POTION,
     ARAN_ACTION_ELEMENTALS,
     ARAN_ACTION_BERSERK,
     ARAN_ACTION_DRAGONS_BREATH,
@@ -120,6 +120,7 @@ struct boss_aranAI : public RangedCombatAI
     boss_aranAI(Creature* creature) : RangedCombatAI(creature, ARAN_ACTION_MAX), m_instance(static_cast<instance_karazhan*>(creature->GetInstanceData()))
     {
         AddTimerlessCombatAction(ARAN_ACTION_DRINK, true);
+        AddTimerlessCombatAction(ARAN_ACTION_POTION, true);
         AddTimerlessCombatAction(ARAN_ACTION_ELEMENTALS, true);
         AddCombatAction(ARAN_ACTION_BERSERK, uint32(12 * MINUTE * IN_MILLISECONDS));
         AddCombatAction(ARAN_ACTION_DRAGONS_BREATH, true);
@@ -177,7 +178,7 @@ struct boss_aranAI : public RangedCombatAI
         }
     }
 
-    uint32 GetNormalSpellCooldown(uint32 spellId) const
+    static uint32 GetNormalSpellCooldown(uint32 spellId)
     {
         switch (spellId)
         {
@@ -248,7 +249,10 @@ struct boss_aranAI : public RangedCombatAI
             case NPC_WATER_ELEMENTAL:
                 summoned->SetInCombatWithZone();
                 if (Unit* target = m_creature->SelectAttackingTarget(ATTACKING_TARGET_RANDOM, 0, nullptr, SELECT_FLAG_PLAYER))
+                {
                     summoned->AddThreat(target, 100000.f);
+                    summoned->AI()->AttackStart(target);
+                }
                 break;
         }
     }
@@ -304,9 +308,16 @@ struct boss_aranAI : public RangedCombatAI
                         m_uiManaRecoveryStage = 0;
                         ResetTimer(ARAN_DRINKING_STAGES, 2000);
                         m_bDrinkInterrupted = false;
+                        SetActionReadyStatus(action, false);
                     }
                 }
                 return;
+            case ARAN_ACTION_POTION:
+            {
+                if (m_creature->GetPowerPercent() < 3.f) // always drink when low
+                    DoCastSpellIfCan(m_creature, SPELL_MANA_POTION);
+                break;
+            }
             case ARAN_ACTION_ELEMENTALS:
             {
                 if (m_creature->GetHealthPercent() > 40.0f)
@@ -336,12 +347,14 @@ struct boss_aranAI : public RangedCombatAI
                 DisableCombatAction(action);
                 return;
             }
+
             case ARAN_ACTION_DRAGONS_BREATH:
             {
-                if (Unit* target = m_creature->SelectAttackingTarget(ATTACKING_TARGET_RANDOM, 0, uint32(0), SELECT_FLAG_PLAYER))
+                if (Unit* target = m_creature->SelectAttackingTarget(ATTACKING_TARGET_RANDOM, 0, uint32(0), (SELECT_FLAG_PLAYER | SELECT_FLAG_IN_MELEE_RANGE)))
                 {
                     DoCastSpellIfCan(target, SPELL_DRAGONS_BREATH, CAST_TRIGGERED);
                     DisableCombatAction(action);
+                    DelayCombatAction(ARAN_ACTION_SUPERSPELL, 6000); // Duration
                 }
                 return;
             }
@@ -370,7 +383,9 @@ struct boss_aranAI : public RangedCombatAI
                         if (DoCastSpellIfCan(m_creature, SPELL_FLAME_WREATH) == CAST_OK)
                         {
                             DoScriptText(urand(0, 1) ? SAY_FLAMEWREATH1 : SAY_FLAMEWREATH2, m_creature);
+#ifdef PRENERF_2_0_3
                             ResetCombatAction(ARAN_ACTION_DRAGONS_BREATH, 27000);
+#endif
                         }
                         break;
                     case SUPER_BLIZZARD:
@@ -428,7 +443,7 @@ struct boss_aranAI : public RangedCombatAI
 
 struct SummonBlizzard : public SpellScript
 {
-    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const override
+    void OnEffectExecute(Spell* spell, SpellEffectIndex /*effIdx*/) const override
     {
         if (Unit* target = spell->GetUnitTarget())
             target->CastSpell(nullptr, 29952, TRIGGERED_OLD_TRIGGERED, nullptr, nullptr, spell->GetCaster()->GetObjectGuid());
@@ -437,7 +452,7 @@ struct SummonBlizzard : public SpellScript
 
 struct DispelBlizzard : public SpellScript
 {
-    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const override
+    void OnEffectExecute(Spell* spell, SpellEffectIndex /*effIdx*/) const override
     {
         if (Unit* target = spell->GetUnitTarget())
             target->RemoveAurasDueToSpell(29952);
@@ -446,7 +461,7 @@ struct DispelBlizzard : public SpellScript
 
 struct MassiveMagneticPull : public SpellScript
 {
-    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const override
+    void OnEffectExecute(Spell* spell, SpellEffectIndex /*effIdx*/) const override
     {
         if (Unit* target = spell->GetUnitTarget())
             spell->GetCaster()->CastSpell(target, 30010, TRIGGERED_OLD_TRIGGERED);
@@ -455,7 +470,7 @@ struct MassiveMagneticPull : public SpellScript
 
 struct FlameWreath : public SpellScript
 {
-    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const override
+    void OnEffectExecute(Spell* spell, SpellEffectIndex /*effIdx*/) const override
     {
         if (Unit* target = spell->GetUnitTarget())
             if (target->IsPlayer())
@@ -474,4 +489,8 @@ void AddSC_boss_shade_of_aran()
     RegisterSpellScript<DispelBlizzard>("spell_dispel_blizzard");
     RegisterSpellScript<MassiveMagneticPull>("spell_massive_magnetic_pull");
     RegisterSpellScript<FlameWreath>("spell_flame_wreath");
+
+    sObjectMgr.AddCreatureCooldown(NPC_SHADOW_OF_ARAN, SPELL_FROSTBOLT, boss_aranAI::GetNormalSpellCooldown(SPELL_FROSTBOLT), boss_aranAI::GetNormalSpellCooldown(SPELL_FROSTBOLT));
+    sObjectMgr.AddCreatureCooldown(NPC_SHADOW_OF_ARAN, SPELL_FIREBALL, boss_aranAI::GetNormalSpellCooldown(SPELL_FIREBALL), boss_aranAI::GetNormalSpellCooldown(SPELL_FIREBALL));
+    sObjectMgr.AddCreatureCooldown(NPC_SHADOW_OF_ARAN, SPELL_ARCANE_MISSILES, boss_aranAI::GetNormalSpellCooldown(SPELL_ARCANE_MISSILES), boss_aranAI::GetNormalSpellCooldown(SPELL_ARCANE_MISSILES));
 }
