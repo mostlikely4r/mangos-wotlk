@@ -106,6 +106,7 @@ class ChatHandler
 
 #ifdef ENABLE_PLAYERBOTS
         WorldSession* GetSession() { return m_session; }
+        bool HandlePerfMonCommand(char* args);
 #endif
 
         /**
