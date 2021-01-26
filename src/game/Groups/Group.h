@@ -160,12 +160,14 @@ class Group
         std::string GetGuidStr() const { return GetObjectGuid().GetString(); }
         bool IsFull() const { return (m_groupType == GROUPTYPE_NORMAL) ? (m_memberSlots.size() >= MAX_GROUP_SIZE) : (m_memberSlots.size() >= MAX_RAID_SIZE); }
         bool isRaidGroup() const { return (m_groupType & GROUPTYPE_RAID) != 0; }
+        bool isLFGGroup() const { return m_groupType & GROUPTYPE_LFD; }
         bool isBattleGroup() const { return m_bgGroup != nullptr || m_bfGroup != nullptr; }
         bool IsCreated()   const { return GetMembersCount() > 0; }
         ObjectGuid const& GetLeaderGuid() const { return m_leaderGuid; }
         const char*       GetLeaderName() const { return m_leaderName.c_str(); }
 
         // member manipulation methods
+        void SetAsLfgGroup() { m_groupType = GroupType(m_groupType | GROUPTYPE_LFD); }
         bool IsMember(ObjectGuid guid) const { return _getMemberCSlot(guid) != m_memberSlots.end(); }
         bool IsLeader(ObjectGuid guid) const { return GetLeaderGuid() == guid; }
         ObjectGuid GetMemberGuid(const std::string& name)

@@ -29,6 +29,7 @@
 #include "Entities/ObjectGuid.h"
 #include "AuctionHouse/AuctionHouseMgr.h"
 #include "Entities/Item.h"
+#include "LFG/LFGMgr.h"
 #include "Server/WorldSocket.h"
 #include "Multithreading/Messager.h"
 
@@ -150,7 +151,7 @@ enum PartyResult
     ERR_PARTY_LFG_TELEPORT_IN_COMBAT    = 30
 };
 
-enum LfgJoinResult
+/*enum LfgJoinResult
 {
     ERR_LFG_OK                                  = 0x00,
     ERR_LFG_ROLE_CHECK_FAILED                   = 0x01,
@@ -174,8 +175,20 @@ enum LfgJoinResult
 
 enum LfgUpdateType
 {
-    LFG_UPDATE_JOIN     = 5,
-    LFG_UPDATE_LEAVE    = 7,
+    LFG_UPDATE_DEFAULT = 0,
+    LFG_UPDATE_LEADER_LEAVE = 1,
+    LFG_UPDATE_ROLECHECK_ABORTED = 4,
+    LFG_UPDATE_JOIN = 5,
+    LFG_UPDATE_ROLECHECK_FAILED = 6,
+    LFG_UPDATE_LEAVE = 7,
+    LFG_UPDATE_PROPOSAL_FAILED = 8,
+    LFG_UPDATE_PROPOSAL_DECLINED = 9,
+    LFG_UPDATE_GROUP_FOUND = 10,
+    LFG_UPDATE_ADDED_TO_QUEUE = 12,
+    LFG_UPDATE_PROPOSAL_BEGIN = 13,
+    LFG_UPDATE_STATUS = 14,
+    LFG_UPDATE_GROUP_MEMBER_OFFLINE = 15,
+    LFG_UPDATE_GROUP_DISBAND = 16,
 };
 
 enum LfgType
@@ -187,7 +200,7 @@ enum LfgType
     LFG_TYPE_ZONE                 = 4,
     LFG_TYPE_HEROIC_DUNGEON       = 5,
     LFG_TYPE_RANDOM_DUNGEON       = 6
-};
+};*/
 
 enum ChatRestrictionType
 {
@@ -303,9 +316,16 @@ class WorldSession
         void SendNotification(const char* format, ...) const ATTR_PRINTF(2, 3);
         void SendNotification(int32 string_id, ...) const;
         void SendPetNameInvalid(uint32 error, const std::string& name, DeclinedName* declinedName) const;
-        void SendLfgSearchResults(LfgType type, uint32 entry) const;
-        void SendLfgJoinResult(LfgJoinResult result) const;
-        void SendLfgUpdate(bool isGroup, LfgUpdateType updateType, uint32 id) const;
+        void SendLfgSearchResults(LfgType type, uint32 entry);
+        void SendLfgJoinResult(LfgJoinResult result, LFGState state, partyForbidden const& lockedDungeons);
+        void SendLfgUpdate(bool isGroup, LFGPlayerStatus status);
+        void SendLfgQueueStatus(LFGQueueStatus const& status);
+        void SendLfgRoleCheckUpdate(LFGRoleCheck const& roleCheck);
+        void SendLfgRoleChosen(uint64 rawGuid, uint8 roles);
+        void SendLfgProposalUpdate(LFGProposal const& proposal);
+        void SendLfgTeleportError(uint8 error);
+        void SendLfgRewards(LFGRewards const& rewards);
+        void SendLfgBootUpdate(LFGBoot const& boot);
         void SendPartyResult(PartyOperation operation, const std::string& member, PartyResult res) const;
         void SendGroupInvite(Player* player, bool alreadyInGroup = false) const;
         void SendAreaTriggerMessage(const char* Text, ...) const ATTR_PRINTF(2, 3);
@@ -978,6 +998,15 @@ class WorldSession
         void HandleReadyForAccountDataTimesOpcode(WorldPacket& recv_data);
         void HandleQueryQuestsCompletedOpcode(WorldPacket& recv_data);
         void HandleQuestPOIQueryOpcode(WorldPacket& recv_data);
+
+        // Dungeon Finder
+        void HandleLfgGetPlayerInfo(WorldPacket& recv_data);
+        void HandleLfgGetPartyInfo(WorldPacket& recv_data);
+        void HandleLfgGetStatus(WorldPacket& recv_data);
+        void HandleLfgSetRoles(WorldPacket& recv_data);
+        void HandleLfgProposalResponse(WorldPacket& recv_data);
+        void HandleLfgTeleportRequest(WorldPacket& recv_data);
+        void HandleLfgBootVote(WorldPacket& recv_data);
 
 #ifdef ENABLE_PLAYERBOTS
         // Playerbots
