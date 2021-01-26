@@ -1357,15 +1357,6 @@ void World::SetInitialWorldSettings()
     sLog.outString("Loading GM tickets...");
     sTicketMgr.LoadGMTickets();
 
-    sLog.outString("Loading Dungeon Finder Requirements...");
-    sObjectMgr.LoadDungeonFinderRequirements();
-
-    sLog.outString("Loading Dungeon Finder Rewards...");
-    sObjectMgr.LoadDungeonFinderRewards();
-
-    sLog.outString("Loading Dungeon Finder Items...");
-    sObjectMgr.LoadDungeonFinderItems();
-
     ///- Load and initialize EventAI Scripts
     sLog.outString("Loading CreatureEventAI Texts...");
     sEventAIMgr.LoadCreatureEventAI_Texts(false);           // false, will checked in LoadCreatureEventAI_Scripts
