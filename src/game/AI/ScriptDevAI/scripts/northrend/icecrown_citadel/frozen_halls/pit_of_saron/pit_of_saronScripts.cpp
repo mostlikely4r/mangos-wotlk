@@ -31,80 +31,11 @@ EndContentData */
 
 enum
 {
-    // Ambush event
-    SPELL_EMPOWERED_SHADOW_BOLT         = 69528,
-    SPELL_SUMMON_UNDEAD                 = 69516,
-
     // Icicles
     SPELL_ICICLE                        = 69426,
     SPELL_ICICLE_DUMMY                  = 69428,
     SPELL_ICE_SHARDS_H                  = 70827,            // used to check the tunnel achievement
 };
-
-/*######
-## npc_ymirjar_deathbringer
-######*/
-
-struct npc_ymirjar_deathbringerAI : public ScriptedAI
-{
-    npc_ymirjar_deathbringerAI(Creature* pCreature) : ScriptedAI(pCreature) { Reset(); }
-
-    uint32 m_uiShadowBoltTimer;
-
-    void Reset() override
-    {
-        m_uiShadowBoltTimer = urand(1000, 3000);
-    }
-
-    void MovementInform(uint32 uiMotionType, uint32 uiPointId) override
-    {
-        if (uiMotionType != POINT_MOTION_TYPE || !uiPointId)
-            return;
-
-        DoCastSpellIfCan(m_creature, SPELL_SUMMON_UNDEAD);
-    }
-
-    void UpdateAI(const uint32 uiDiff) override
-    {
-        if (!m_creature->SelectHostileTarget() || !m_creature->GetVictim())
-            return;
-
-        if (m_uiShadowBoltTimer < uiDiff)
-        {
-            if (Unit* pTarget = m_creature->SelectAttackingTarget(ATTACKING_TARGET_RANDOM, 0))
-            {
-                if (DoCastSpellIfCan(pTarget, SPELL_EMPOWERED_SHADOW_BOLT) == CAST_OK)
-                    m_uiShadowBoltTimer = urand(2000, 3000);
-            }
-        }
-        else
-            m_uiShadowBoltTimer -= uiDiff;
-
-        DoMeleeAttackIfReady();
-    }
-};
-
-bool EffectDummyCreature_spell_summon_undead(Unit* /*pCaster*/, uint32 uiSpellId, SpellEffectIndex uiEffIndex, Creature* pCreatureTarget, ObjectGuid /*originalCasterGuid*/)
-{
-    // always check spellid and effectindex
-    if (uiSpellId == SPELL_SUMMON_UNDEAD && uiEffIndex == EFFECT_INDEX_0)
-    {
-        if (pCreatureTarget->GetEntry() != NPC_YMIRJAR_DEATHBRINGER)
-            return true;
-
-        float fX, fY, fZ;
-        for (uint8 i = 0; i < 4; ++i)
-        {
-            pCreatureTarget->GetNearPoint(pCreatureTarget, fX, fY, fZ, 0, frand(8.0f, 12.0f), M_PI_F * 0.5f * i);
-            pCreatureTarget->SummonCreature(i % 2 ? NPC_YMIRJAR_WRATHBRINGER : NPC_YMIRJAR_FLAMEBEARER, fX, fY, fZ, 3.75f, TEMPSPAWN_DEAD_DESPAWN, 0);
-        }
-
-        // always return true when we are handling this spell and effect
-        return true;
-    }
-
-    return false;
-}
 
 /*######
 ## npc_collapsing_icicle
@@ -115,16 +46,17 @@ struct npc_collapsing_icicleAI : public ScriptedAI
     npc_collapsing_icicleAI(Creature* pCreature) : ScriptedAI(pCreature)
     {
         m_pInstance = (instance_pit_of_saron*)pCreature->GetInstanceData();
+        m_creature->SetCanEnterCombat(false);
+        SetReactState(REACT_PASSIVE);
+        m_uiCastTimer = 3000;
         Reset();
     }
 
     instance_pit_of_saron* m_pInstance;
 
-    void Reset() override
-    {
-        DoCastSpellIfCan(m_creature, SPELL_ICICLE_DUMMY, CAST_TRIGGERED);
-        DoCastSpellIfCan(m_creature, SPELL_ICICLE, CAST_TRIGGERED);
-    }
+    uint32 m_uiCastTimer;
+
+    void Reset() override {}
 
     void SpellHitTarget(Unit* pTarget, const SpellEntry* pSpell) override
     {
@@ -133,9 +65,22 @@ struct npc_collapsing_icicleAI : public ScriptedAI
             m_pInstance->SetSpecialAchievementCriteria(TYPE_ACHIEV_DONT_LOOK_UP, false);
     }
 
-    void AttackStart(Unit* /*pWho*/) override { }
-    void MoveInLineOfSight(Unit* /*pWho*/) override { }
-    void UpdateAI(const uint32 /*uiDiff*/) override { }
+    void UpdateAI(const uint32 uiDiff) override
+    {
+        if (m_uiCastTimer)
+        {
+            if (m_uiCastTimer <= uiDiff)
+            {
+                if (DoCastSpellIfCan(m_creature, SPELL_ICICLE_DUMMY) == CAST_OK)
+                {
+                    DoCastSpellIfCan(m_creature, SPELL_ICICLE, CAST_TRIGGERED);
+                    m_uiCastTimer = 0;
+                }
+            }
+            else
+                m_uiCastTimer -= uiDiff;
+        }
+    }
 };
 
 /*######
@@ -157,7 +102,6 @@ bool AreaTrigger_at_pit_of_saron(Player* pPlayer, AreaTriggerEntry const* pAt)
                 pInstance->GetData(TYPE_AMBUSH) != NOT_STARTED)
             return false;
 
-        pInstance->DoStartAmbushEvent();
         pInstance->SetData(TYPE_AMBUSH, IN_PROGRESS);
         return true;
     }
@@ -190,6 +134,10 @@ struct spell_necromantic_power : public SpellScript
 
         target->RemoveAurasDueToSpell(69413);
 
+        // Krick has separate script
+        if (target->GetEntry() == NPC_KRICK)
+            return;
+
         // apply feign death aura 28728; calculated spell value is 22516, but this isn't used
         target->CastSpell(target, 28728, TRIGGERED_OLD_TRIGGERED);
     }
@@ -211,7 +159,7 @@ struct spell_strangulating_aura : public AuraScript
 
         // on apply move randomly around Tyrannus
         if (apply)
-            target->GetMotionMaster()->MoveRandomAroundPoint(target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), frand(5.0f, 8.0f), frand(5.0f, 10.0f));
+            target->GetMotionMaster()->MoveRandomAroundPoint(target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), frand(8.0f, 16.0f), frand(5.0f, 10.0f));
         // on remove fall to the ground
         else
         {
@@ -246,15 +194,104 @@ struct spell_feigh_death_pos_aura : public AuraScript
     }
 };
 
+/*######
+## spell_slave_trigger_closest - 71281
+######*/
+
+struct spell_slave_trigger_closest : public SpellScript
+{
+    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const
+    {
+        if (effIdx != EFFECT_INDEX_0)
+            return;
+
+        Unit* caster = spell->GetAffectiveCaster();
+        Unit* target = spell->GetUnitTarget();
+        if (!target || !target->IsCreature() || !caster || !caster->IsPlayer())
+            return;
+
+        Player* player = static_cast<Player*>(caster);
+        player->RewardPlayerAndGroupAtEventCredit(player->GetTeam() == ALLIANCE ? 36764 : 36770, target);
+
+        Creature* pSlave = static_cast<Creature*>(target);
+
+        // Note: emotes are handled in EAI
+
+        float fX, fY, fZ;
+        pSlave->GetNearPoint(pSlave, fX, fY, fZ, 0, 50.0f, M_PI_F * 0.5f);
+        pSlave->HandleEmote(EMOTE_ONESHOT_NONE);
+        pSlave->GetMotionMaster()->MovePoint(0, fX, fY, fZ);
+        pSlave->ForcedDespawn(20000);
+    }
+};
+
+/*######
+## spell_summon_undead - 69516
+######*/
+
+struct spell_summon_undead : public SpellScript
+{
+    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const
+    {
+        if (effIdx != EFFECT_INDEX_0)
+            return;
+
+        Unit* caster = spell->GetAffectiveCaster();
+        if (!caster || !caster->IsCreature())
+            return;
+
+        float fX, fY, fZ;
+        for (uint8 i = 0; i < 4; ++i)
+        {
+            caster->GetNearPoint(caster, fX, fY, fZ, 0, frand(8.0f, 12.0f), M_PI_F * 0.5f * i);
+            caster->SummonCreature(i % 2 ? NPC_YMIRJAR_WRATHBRINGER : NPC_YMIRJAR_FLAMEBEARER, fX, fY, fZ, 3.75f, TEMPSPAWN_DEAD_DESPAWN, 0);
+        }
+    }
+};
+
+/*######
+## spell_jainas_call - 70527
+######*/
+
+struct spell_jainas_call : public SpellScript
+{
+    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const
+    {
+        if (effIdx != EFFECT_INDEX_0)
+            return;
+
+        Unit* caster = spell->GetAffectiveCaster();
+        Unit* target = spell->GetUnitTarget();
+        if (!caster || !target->IsPlayer())
+            return;
+
+        caster->CastSpell(target, 70525, TRIGGERED_OLD_TRIGGERED);
+    }
+};
+
+/*######
+## spell_call_of_sylvanas - 70636
+######*/
+
+struct spell_call_of_sylvanas : public SpellScript
+{
+    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const
+    {
+        if (effIdx != EFFECT_INDEX_0)
+            return;
+
+        Unit* caster = spell->GetAffectiveCaster();
+        Unit* target = spell->GetUnitTarget();
+        if (!caster || !target->IsPlayer())
+            return;
+
+        caster->CastSpell(target, 70639, TRIGGERED_OLD_TRIGGERED);
+    }
+};
+
 void AddSC_pit_of_saron()
 {
     Script* pNewScript = new Script;
-    pNewScript->Name = "npc_ymirjar_deathbringer";
-    pNewScript->GetAI = &GetNewAIInstance<npc_ymirjar_deathbringerAI>;
-    pNewScript->pEffectDummyNPC = &EffectDummyCreature_spell_summon_undead;
-    pNewScript->RegisterSelf();
-
-    pNewScript = new Script;
     pNewScript->Name = "npc_collapsing_icicle";
     pNewScript->GetAI = &GetNewAIInstance<npc_collapsing_icicleAI>;
     pNewScript->RegisterSelf();
@@ -267,4 +304,8 @@ void AddSC_pit_of_saron()
     RegisterSpellScript<spell_necromantic_power>("spell_necromantic_power");
     RegisterAuraScript<spell_strangulating_aura>("spell_strangulating_aura");
     RegisterAuraScript<spell_feigh_death_pos_aura>("spell_feigh_death_pos_aura");
+    RegisterSpellScript<spell_slave_trigger_closest>("spell_slave_trigger_closest");
+    RegisterSpellScript<spell_summon_undead>("spell_summon_undead");
+    RegisterSpellScript<spell_jainas_call>("spell_jainas_call");
+    RegisterSpellScript<spell_call_of_sylvanas>("spell_call_of_sylvanas");
 }

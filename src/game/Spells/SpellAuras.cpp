@@ -1957,22 +1957,6 @@ void Aura::TriggerSpell()
 //                    case 65422: break;
 //                    // Rolling Throw
 //                    case 67546: break;
-                    case 69012:                             // Explosive Barrage
-                    {
-                        // Summon an Exploding Orb for each player in combat with the caster
-                        ThreatList const& threatList = target->getThreatManager().getThreatList();
-                        for (auto itr : threatList)
-                        {
-                            if (Unit* expectedTarget = target->GetMap()->GetUnit(itr->getUnitGuid()))
-                            {
-                                if (expectedTarget->GetTypeId() == TYPEID_PLAYER)
-                                    target->CastSpell(expectedTarget, 69015, TRIGGERED_OLD_TRIGGERED);
-                            }
-                        }
-                        return;
-                    }
-//                    // Gunship Cannon Fire
-//                    case 70017: break;
 //                    // Ice Tomb
 //                    case 70157: break;
 //                    // Mana Barrier                       // HANDLED IN SD2!
@@ -2857,14 +2841,6 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
                             // TODO - this is confusing, it seems the boss should channel this aura, and start casting the next spell
                             caster->CastSpell(caster, 68899, TRIGGERED_NONE);
                         }
-                        return;
-                    case 70623:                             // Jaina's Call
-                        if (target->GetTypeId() == TYPEID_PLAYER)
-                            target->CastSpell(target, 70525, TRIGGERED_OLD_TRIGGERED, nullptr, this);
-                        return;
-                    case 70638:                             // Call of Sylvanas
-                        if (target->GetTypeId() == TYPEID_PLAYER)
-                            target->CastSpell(target, 70639, TRIGGERED_OLD_TRIGGERED, nullptr, this);
                         return;
                     case 71342:                             // Big Love Rocket
                         Spell::SelectMountByAreaAndSkill(target, GetSpellProto(), 71344, 71345, 71346, 71347, 0);

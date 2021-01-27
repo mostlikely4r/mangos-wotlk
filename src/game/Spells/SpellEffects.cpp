@@ -5037,9 +5037,9 @@ void Spell::EffectTriggerSpell(SpellEffectIndex effIndex)
     caster->CastSpell(targets, spellInfo, TRIGGERED_OLD_TRIGGERED, m_CastItem, nullptr, m_originalCasterGUID, m_spellInfo);
 }
 
-void Spell::EffectTriggerMissileSpell(SpellEffectIndex effect_idx)
+void Spell::EffectTriggerMissileSpell(SpellEffectIndex effIndex)
 {
-    uint32 triggered_spell_id = m_spellInfo->EffectTriggerSpell[effect_idx];
+    uint32 triggered_spell_id = m_spellInfo->EffectTriggerSpell[effIndex];
 
     // normal case
     SpellEntry const* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(triggered_spell_id);
@@ -5053,7 +5053,7 @@ void Spell::EffectTriggerMissileSpell(SpellEffectIndex effect_idx)
         }
         else
             sLog.outError("EffectTriggerMissileSpell of spell %u (eff: %u): triggering unknown spell id %u",
-                          m_spellInfo->Id, effect_idx, triggered_spell_id);
+                          m_spellInfo->Id, effIndex, triggered_spell_id);
         return;
     }
 
@@ -5061,12 +5061,38 @@ void Spell::EffectTriggerMissileSpell(SpellEffectIndex effect_idx)
         DEBUG_FILTER_LOG(LOG_FILTER_SPELL_CAST, "WORLD: cast Item spellId - %i", spellInfo->Id);
 
     SpellCastTargets targets;
-    if (unitTarget)
-        targets.setUnitTarget(unitTarget);
-    else if (gameObjTarget)
-        targets.setGOTarget(gameObjTarget);
+
+    if (spellInfo->Targets & TARGET_FLAG_DEST_LOCATION)
+    {
+        if (m_targets.m_targetMask & TARGET_FLAG_DEST_LOCATION)
+        {
+            float x, y, z;
+            m_targets.getDestination(x, y, z);
+            targets.setDestination(x, y, z);
+        }
+        else if (unitTarget)
+        {
+            float x, y, z;
+            unitTarget->GetPosition(x, y, z);
+            targets.setDestination(x, y, z);
+        }
+    }
     else
-        targets.setDestination(m_targets.m_destPos.x, m_targets.m_destPos.y, m_targets.m_destPos.z);
+    {
+        switch (m_spellInfo->EffectImplicitTargetA[effIndex])
+        {
+            case TARGET_LOCATION_UNIT_MINION_POSITION: break; // confirmed by 31348 nothing is forwarded
+            default:
+            {
+                if (unitTarget)
+                    targets.setUnitTarget(unitTarget);
+                else if (gameObjTarget)
+                    targets.setGOTarget(gameObjTarget);
+                break;
+            }
+        }
+    }
+
     m_caster->CastSpell(targets, spellInfo, TRIGGERED_OLD_TRIGGERED, m_CastItem, nullptr, m_originalCasterGUID, m_spellInfo);
 }
 
@@ -10371,26 +10397,12 @@ void Spell::EffectScriptEffect(SpellEffectIndex eff_idx)
                     m_caster->CastSpell(m_caster, 50250, TRIGGERED_OLD_TRIGGERED);
                     return;
                 }
-                case 50255:                                 // Poisoned Spear
-                case 59331:                                 // Poisoned Spear (heroic)
-                {
-                    if (!unitTarget)
-                        return;
-
-                    unitTarget->CastSpell(unitTarget, m_spellInfo->CalculateSimpleValue(eff_idx), TRIGGERED_OLD_TRIGGERED, nullptr, nullptr, m_originalCasterGUID);
-                    return;
-                }
                 case 50439:                                 // Script Cast Summon Image of Drakuru 05
                 {
                     // TODO: check if summon already exist, if it does in this instance, return.
 
                     // Summon Drakuru
                     m_caster->CastSpell(m_caster, 50446, TRIGGERED_OLD_TRIGGERED);
-                    return;
-                }
-                case 50630:                                 // Eject All Passengers
-                {
-                    m_caster->RemoveSpellsCausingAura(SPELL_AURA_CONTROL_VEHICLE);
                     return;
                 }
                 case 50725:                                 // Vigilance - remove cooldown on Taunt
@@ -10498,15 +10510,6 @@ void Spell::EffectScriptEffect(SpellEffectIndex eff_idx)
 
                     break;
                 }
-                case 53110:                                 // Devour Humanoid
-                {
-                    if (!unitTarget || unitTarget->GetTypeId() != TYPEID_UNIT)
-                        return;
-
-                    unitTarget->CastSpell(m_caster, m_spellInfo->CalculateSimpleValue(eff_idx), TRIGGERED_OLD_TRIGGERED);
-                    ((Creature*)unitTarget)->ForcedDespawn(8000);
-                    return;
-                }
                 case 54182:                                 // An End to the Suffering: Quest Completion Script
                 {
                     if (!unitTarget)
@@ -10550,15 +10553,6 @@ void Spell::EffectScriptEffect(SpellEffectIndex eff_idx)
                     unitTarget->RemoveSpellsCausingAura(SPELL_AURA_MOD_STUN);
                     return;
                 }
-                case 54640:                                 // Teleport
-                {
-                    if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER)
-                        return;
-
-                    if (!unitTarget->HasAura(m_spellInfo->CalculateSimpleValue(eff_idx)))
-                        unitTarget->CastSpell(unitTarget, m_spellInfo->CalculateSimpleValue(eff_idx), TRIGGERED_OLD_TRIGGERED);
-                    return;
-                }
                 case 55693:                                 // Remove Collapsing Cave Aura
                 {
                     if (!unitTarget)
@@ -10594,34 +10588,6 @@ void Spell::EffectScriptEffect(SpellEffectIndex eff_idx)
                     unitTarget->CastSpell(unitTarget, 57085, TRIGGERED_OLD_TRIGGERED);
                     break;
                 }
-                case 58418:                                 // Portal to Orgrimmar
-                case 58420:                                 // Portal to Stormwind
-                {
-                    if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER || eff_idx != EFFECT_INDEX_0)
-                        return;
-
-                    uint32 spellID = m_spellInfo->CalculateSimpleValue(EFFECT_INDEX_0);
-                    uint32 questID = m_spellInfo->CalculateSimpleValue(EFFECT_INDEX_1);
-
-                    if (((Player*)unitTarget)->GetQuestStatus(questID) == QUEST_STATUS_COMPLETE && !((Player*)unitTarget)->GetQuestRewardStatus(questID))
-                        unitTarget->CastSpell(unitTarget, spellID, TRIGGERED_OLD_TRIGGERED);
-
-                    return;
-                }
-                case 59317:                                 // Teleporting
-                {
-                    if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER)
-                        return;
-
-                    // return from top
-                    if (((Player*)unitTarget)->GetAreaId() == 4637)
-                        unitTarget->CastSpell(unitTarget, 59316, TRIGGERED_OLD_TRIGGERED);
-                    // teleport atop
-                    else
-                        unitTarget->CastSpell(unitTarget, 59314, TRIGGERED_OLD_TRIGGERED);
-
-                    return;
-                }                                           // random spell learn instead placeholder
                 case 59789:                                 // Oracle Ablutions
                 {
                     if (!unitTarget)
