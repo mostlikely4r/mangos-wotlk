@@ -524,7 +524,10 @@ bool WorldSession::Update(uint32 diff)
                     return false;
 
                 // give the opportunity for this player to reconnect within 20 sec
-                SetOffline();
+#ifdef ENABLE_PLAYERBOTS
+                if (!_player->GetPlayerbotAI())
+#endif
+                    SetOffline();
             }
             else if (ShouldLogOut(time(nullptr)) && !m_playerLoading)   // check if delayed logout is fired
                 LogoutPlayer();
