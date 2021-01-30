@@ -942,15 +942,8 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
     SqlStatement stmt = CharacterDatabase.CreateStatement(updChars, "UPDATE characters SET online = 1 WHERE guid = ?");
     stmt.PExecute(pCurrChar->GetGUIDLow());
 
-//#ifdef ENABLE_PLAYERBOTS
-//    if (pCurrChar->GetSession()->GetRemoteAddress() != "bot")
-//    {
-//#endif
     stmt = LoginDatabase.CreateStatement(updAccount, "UPDATE account SET active_realm_id = ? WHERE id = ?");
     stmt.PExecute(realmID, GetAccountId());
-//#ifdef ENABLE_PLAYERBOTS
-//    }
-//#endif
 
     pCurrChar->SetInGameTime(WorldTimer::getMSTime());
 
@@ -1036,13 +1029,7 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
             pCurrChar->CastSpell(pCurrChar, invisibleAuraInfo, TRIGGERED_OLD_TRIGGERED);
     }
 
-    std::string IP_str =
-#ifdef ENABLE_PLAYERBOTS
-        m_Socket ? m_Socket->GetRemoteAddress() : "bot";
-#else
-        GetRemoteAddress();
-#endif
-
+    std::string IP_str = GetRemoteAddress();
     sLog.outChar("Account: %d (IP: %s) Login Character:[%s] (guid: %u)",
                  GetAccountId(), IP_str.c_str(), pCurrChar->GetName(), pCurrChar->GetGUIDLow());
 
