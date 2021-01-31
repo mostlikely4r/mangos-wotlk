@@ -120,7 +120,9 @@ void PlayerbotHolder::HandlePlayerBotLoginCallback(QueryResult * dummy, SqlQuery
     uint32 botAccountId = lqh->GetAccountId();
     WorldSession *botSession = new WorldSession(botAccountId, NULL, SEC_PLAYER,
 #ifndef MANGOSBOT_ZERO
-        1,
+        MAX_EXPANSION,
+#else
+        0,
 #endif
         0, LOCALE_enUS);
 
