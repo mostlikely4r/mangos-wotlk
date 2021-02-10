@@ -952,6 +952,8 @@ struct BGData
     WorldLocation joinPos;                                  ///< From where player entered BG, saved
 
     bool m_needSave;                                        ///< true, if saved to DB fields modified after prev. save (marked as "saved" above)
+
+    bool forLFG;                                            ///< true, if data used for LFG entry point set (fields modified after prev. save (instanceID = 0!)
 };
 
 struct TradeStatusInfo
@@ -1928,6 +1930,7 @@ class Player : public Unit
         void CleanupChannels();
         void UpdateLocalChannels(uint32 newZone);
         void LeaveLFGChannel();
+        void JoinLFGChannel();
 
         void UpdateDefense();
         void UpdateWeaponSkill(WeaponAttackType attType);
@@ -2190,7 +2193,7 @@ class Player : public Unit
         }
 
         WorldLocation const& GetBattleGroundEntryPoint() const { return m_bgData.joinPos; }
-        void SetBattleGroundEntryPoint();
+        void SetBattleGroundEntryPoint(bool forLFG = false);
 
         void SetBGTeam(Team team) { m_bgData.bgTeam = team; m_bgData.m_needSave = true; }
         Team GetBGTeam() const { return m_bgData.bgTeam ? m_bgData.bgTeam : GetTeam(); }
@@ -2358,6 +2361,7 @@ class Player : public Unit
 
         AreaLockStatus GetAreaTriggerLockStatus(AreaTrigger const* at, Difficulty difficulty, uint32& miscRequirement, bool forceAllChecks = false);
         void SendTransferAbortedByLockStatus(MapEntry const* mapEntry, AreaLockStatus lockStatus, uint32 miscRequirement = 0) const;
+        uint8 GetTalentsCount(uint8 tab);
 
         /*********************************************************/
         /***                   GROUP SYSTEM                    ***/
@@ -2825,6 +2829,8 @@ class Player : public Unit
         ReputationMgr  m_reputationMgr;
 
         uint32 m_cachedGS;
+
+        uint8  m_cachedTC[3];
 
         bool m_isGhouled;
 

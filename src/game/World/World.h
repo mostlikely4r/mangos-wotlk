@@ -213,7 +213,8 @@ enum eConfigUInt32Values
     CONFIG_UINT32_FOGOFWAR_STATS,
     CONFIG_UINT32_CREATURE_PICKPOCKET_RESTOCK_DELAY,
     CONFIG_UINT32_CHANNEL_STATIC_AUTO_TRESHOLD,
-    CONFIG_UINT32_VALUE_COUNT
+    CONFIG_UINT32_VALUE_COUNT,
+    CONFIG_UINT32_LFG_MAXKICKS
 };
 
 /// Configuration elements
@@ -379,7 +380,13 @@ enum eConfigBoolValues
     CONFIG_BOOL_AUTOLOAD_ACTIVE,
     CONFIG_BOOL_PATH_FIND_OPTIMIZE,
     CONFIG_BOOL_PATH_FIND_NORMALIZE_Z,
-    CONFIG_BOOL_VALUE_COUNT
+    CONFIG_BOOL_VALUE_COUNT,
+    CONFIG_BOOL_LFG_ENABLE,
+    CONFIG_BOOL_LFR_ENABLE,
+    CONFIG_BOOL_LFG_DEBUG_ENABLE,
+    CONFIG_BOOL_LFR_EXTEND,
+    CONFIG_BOOL_LFG_ONLYLASTENCOUNTER,
+    CONFIG_BOOL_RAID_FLAGS_UNIQUE
 };
 
 /// Can be used in SMSG_AUTH_RESPONSE packet
@@ -660,6 +667,10 @@ class World
 
         Messager<World>& GetMessager() { return m_messager; }
 
+        // Disable dungeons for LFG system
+        void setDisabledMapIdForDungeonFinder(const char* areas);
+        bool IsDungeonMapIdDisable(uint32 mapId);
+
         void IncrementOpcodeCounter(uint32 opcodeId); // thread safe due to atomics
     protected:
         void _UpdateGameTime();
@@ -759,6 +770,9 @@ class World
         // used versions
         std::string m_DBVersion;
         std::string m_CreatureEventAIVersion;
+
+        // Disable dungeons for LFG system
+        std::set<uint32> disabledMapIdForDungeonFinder; // set of MapIds which are disabled for DungeonFinder
 
         // List of Maps that should be force-loaded on startup
         std::set<uint32> m_configForceLoadMapIds;

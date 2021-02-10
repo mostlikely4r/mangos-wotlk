@@ -763,6 +763,16 @@ void World::LoadConfigSettings(bool reload)
     setConfig(CONFIG_UINT32_BATTLEFIELD_BATTLE_DURATION,               "Battlefield.BattleDuration", 30);
     setConfig(CONFIG_UINT32_BATTLEFIELD_MAX_PLAYERS_PER_TEAM,          "Battlefield.MaxPlayersPerTeam", 120);
 
+    // Dungeon Finder
+    setConfig(CONFIG_BOOL_LFG_ENABLE, "LFG.Enable", false);
+    setConfig(CONFIG_BOOL_LFR_ENABLE, "LFR.Enable", false);
+    setConfig(CONFIG_BOOL_LFG_DEBUG_ENABLE, "LFG.Debug", false);
+    setConfig(CONFIG_BOOL_LFR_EXTEND, "LFR.Extend", false);
+    setConfig(CONFIG_BOOL_LFG_ONLYLASTENCOUNTER, "LFG.OnlyLastEncounterForCompleteDungeon", false);
+    setConfigMinMax(CONFIG_UINT32_LFG_MAXKICKS, "LFG.MaxKicks", 5, 1, 10);
+    std::string disabledMapIdForLFG = sConfig.GetStringDefault("LFG.DisableDungeonMapIds", "");
+    setDisabledMapIdForDungeonFinder(disabledMapIdForLFG.c_str());
+
     setConfig(CONFIG_BOOL_OFFHAND_CHECK_AT_TALENTS_RESET, "OffhandCheckAtTalentsReset", false);
 
     setConfig(CONFIG_BOOL_KICK_PLAYER_ON_BAD_PACKET, "Network.KickOnBadPacket", false);
@@ -1333,6 +1343,9 @@ void World::SetInitialWorldSettings()
     sLog.outString(">>> Localization strings loaded");
     sLog.outString();
 
+    sLog.outString("Loading LFG rewards...");               // After load all static data
+    sLFGMgr.LoadRewards();
+
     ///- Load dynamic data tables from the database
     sLog.outString("Loading Auctions...");
     sAuctionMgr.LoadAuctionItems();
@@ -1663,6 +1676,9 @@ void World::Update(uint32 diff)
         m_timers[WUPDATE_DELETECHARS].Reset();
         Player::DeleteOldCharacters();
     }
+
+    // Check if any group can be created by dungeon finder
+    sLFGMgr.Update(diff);
 
     // execute callbacks from sql queries that were queued recently
     UpdateResultQueue();
@@ -2735,6 +2751,23 @@ void World::InvalidatePlayerDataToAllClient(ObjectGuid guid) const
     WorldPacket data(SMSG_INVALIDATE_PLAYER, 8);
     data << guid;
     SendGlobalMessage(data);
+}
+
+// Dungeonfinder
+void World::setDisabledMapIdForDungeonFinder(const char* mapIds)
+{
+    disabledMapIdForDungeonFinder.clear();
+
+    Tokens disabledMapId = StrSplit(mapIds, ",");
+    for (Tokens::iterator it = disabledMapId.begin(); it != disabledMapId.end(); ++it)
+    {
+        disabledMapIdForDungeonFinder.insert(stoi(*it));
+    }
+}
+
+bool World::IsDungeonMapIdDisable(uint32 mapId)
+{
+    return disabledMapIdForDungeonFinder.find(mapId) != disabledMapIdForDungeonFinder.end();
 }
 
 void World::IncrementOpcodeCounter(uint32 opcodeId)

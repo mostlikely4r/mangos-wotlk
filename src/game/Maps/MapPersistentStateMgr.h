@@ -208,6 +208,7 @@ class DungeonPersistentState : public MapPersistentState
         void SetCanReset(bool canReset) { m_canReset = canReset; }
 
         // DBC encounter state update at kill/spell cast
+        bool IsCompleted();
         void UpdateEncounterState(EncounterCreditType type, uint32 creditEntry);
 
         // mask of completed encounters

@@ -32,6 +32,7 @@
 #include "World/World.h"
 #include "Groups/Group.h"
 #include "Maps/InstanceData.h"
+#include "LFG/LFGMgr.h"
 #include "ProgressBar.h"
 
 INSTANTIATE_SINGLETON_1(MapPersistentStateManager);
@@ -285,6 +286,29 @@ time_t DungeonPersistentState::GetResetTimeForDB() const
     return GetResetTime();
 }
 
+bool DungeonPersistentState::IsCompleted()
+{
+    DungeonEncounterMap const* encounterList = sObjectMgr.GetDungeonEncounters();
+
+    if (!encounterList)
+        return false;
+
+    for (DungeonEncounterMap::const_iterator itr = encounterList->begin(); itr != encounterList->end(); ++itr)
+    {
+        DungeonEncounter const* encounter = itr->second;
+
+        if (!encounter)
+            continue;
+
+        if (GetMapId() != encounter->dbcEntry->mapId || GetDifficulty() != encounter->dbcEntry->Difficulty)
+            continue;
+
+        if (!(m_completedEncountersMask & (1 << encounter->dbcEntry->encounterIndex)))
+            return false;
+    }
+    return true;
+}
+
 void DungeonPersistentState::UpdateEncounterState(EncounterCreditType type, uint32 creditEntry)
 {
     DungeonEncounterMapBounds bounds = sObjectMgr.GetDungeonEncounterBounds(creditEntry);
@@ -295,15 +319,31 @@ void DungeonPersistentState::UpdateEncounterState(EncounterCreditType type, uint
 
         if (iter->second->creditType == type && Difficulty(dbcEntry->Difficulty) == GetDifficulty() && dbcEntry->mapId == GetMapId())
         {
+            uint32 oldMask = m_completedEncountersMask;
             m_completedEncountersMask |= 1 << dbcEntry->encounterIndex;
 
-            CharacterDatabase.PExecute("UPDATE instance SET encountersMask = '%u' WHERE id = '%u'", m_completedEncountersMask, GetInstanceId());
+            DungeonMap* dungeon = (DungeonMap*)GetMap();
 
-            DEBUG_LOG("DungeonPersistentState: Dungeon %s (Id %u) completed encounter %s", GetMap()->GetMapName(), GetInstanceId(), dbcEntry->encounterName[sWorld.GetDefaultDbcLocale()]);
-            if (/*uint32 dungeonId =*/ iter->second->lastEncounterDungeon)
+            if (!dungeon || dungeon->GetPlayers().isEmpty())
+                return;
+
+            Player* player = dungeon->GetPlayers().begin()->getSource();
+            if (m_completedEncountersMask != oldMask)
             {
-                DEBUG_LOG("DungeonPersistentState:: Dungeon %s (Instance-Id %u) completed last encounter %s", GetMap()->GetMapName(), GetInstanceId(), dbcEntry->encounterName[sWorld.GetDefaultDbcLocale()]);
-                // Place LFG reward here
+                CharacterDatabase.PExecute("UPDATE instance SET encountersMask = '%u' WHERE id = '%u'", m_completedEncountersMask, GetInstanceId());
+
+                uint32 dungeonId = iter->second->lastEncounterDungeon;
+
+                DEBUG_LOG("DungeonPersistentState: Dungeon %s (Id %u) completed encounter %s", GetMap()->GetMapName(), GetInstanceId(), dbcEntry->encounterName[sWorld.GetDefaultDbcLocale()]);
+
+                if (dungeon && player && player->GetGroup() && player->GetGroup()->isLFGGroup())
+                {
+                    sLFGMgr.DungeonEncounterReached(player->GetGroup());
+
+                    if ((sWorld.getConfig(CONFIG_BOOL_LFG_ONLYLASTENCOUNTER) && dungeonId)
+                        || IsCompleted())
+                        sLFGMgr.SendLFGRewards(player->GetGroup());
+                }
             }
             return;
         }

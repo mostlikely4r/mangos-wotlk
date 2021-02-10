@@ -27,6 +27,8 @@
 #include "Battlefield/Battlefield.h"
 #include "Server/DBCEnums.h"
 #include "Globals/SharedDefines.h"
+#include "LFG/LFG.h"
+#include "LFG/LFGMgr.h"
 
 struct ItemPrototype;
 
@@ -64,9 +66,9 @@ enum GroupType                                              // group type flags?
     GROUPTYPE_BG     = 0x01,
     GROUPTYPE_RAID   = 0x02,
     GROUPTYPE_BGRAID = GROUPTYPE_BG | GROUPTYPE_RAID,       // mask
-    // 0x04?
+    GROUPTYPE_UNK1   = 0x04,
     GROUPTYPE_LFD    = 0x08,
-    // 0x10, leave/change group?, I saw this flag when leaving group and after leaving BG while in group
+    GROUPTYPE_UNK2   = 0x10,
 };
 
 enum GroupFlagMask
@@ -127,6 +129,7 @@ class Group
             std::string name;
             uint8       group;
             bool        assistant;
+            LFGRoleMask roles;
             uint32      lastMap;
         };
         typedef std::list<MemberSlot> MemberSlotList;
@@ -138,13 +141,13 @@ class Group
         typedef std::set<Player*> InvitesList;
 
     public:
-        Group();
+        Group(GroupType type);
         ~Group();
 
         // group manipulation methods
         bool   Create(ObjectGuid guid, const char* name);
         bool   LoadGroupFromDB(Field* fields);
-        bool   LoadMemberFromDB(uint32 guidLow, uint8 subgroup, bool assistant);
+        bool   LoadMemberFromDB(uint32 guidLow, uint8 subgroup, bool assistant, LFGRoleMask roles);
         bool   AddInvite(Player* player);
         uint32 RemoveInvite(Player* player);
         void   RemoveAllInvites();
@@ -158,7 +161,7 @@ class Group
         uint32 GetId() const { return m_Id; }
         ObjectGuid GetObjectGuid() const { return ObjectGuid(HIGHGUID_GROUP, GetId()); }
         std::string GetGuidStr() const { return GetObjectGuid().GetString(); }
-        bool IsFull() const { return (m_groupType == GROUPTYPE_NORMAL) ? (m_memberSlots.size() >= MAX_GROUP_SIZE) : (m_memberSlots.size() >= MAX_RAID_SIZE); }
+        bool IsFull() const { return (m_groupType == GROUPTYPE_NORMAL || isLFGGroup()) ? (m_memberSlots.size() >= MAX_GROUP_SIZE) : (m_memberSlots.size() >= MAX_RAID_SIZE); }
         bool isRaidGroup() const { return (m_groupType & GROUPTYPE_RAID) != 0; }
         bool isBattleGroup() const { return m_bgGroup != nullptr || m_bfGroup != nullptr; }
         bool IsCreated()   const { return GetMembersCount() > 0; }
@@ -291,13 +294,23 @@ class Group
         InstanceGroupBind* GetBoundInstance(Map* aMap, Difficulty difficulty);
         BoundInstancesMap& GetBoundInstances(Difficulty difficulty) { return m_boundInstances[difficulty]; }
 
+        // LFG
+        bool ConvertToLFG(LFGType type);
+        bool isLFDGroup()  const { return m_groupType & GROUPTYPE_LFD; }
+        bool isLFGGroup()  const { return ((m_groupType & GROUPTYPE_LFD) && !(m_groupType & GROUPTYPE_RAID)); }
+        bool isLFRGroup()  const { return ((m_groupType & GROUPTYPE_LFD) && (m_groupType & GROUPTYPE_RAID)); }
+        void SetGroupRoles(ObjectGuid guid, LFGRoleMask roles);
+        LFGRoleMask GetGroupRoles(ObjectGuid guid);
+        bool IsNeedSave() const;
+        GroupType GetGroupType() const { return m_groupType; };
+
 #ifdef ENABLE_PLAYERBOTS
         ObjectGuid GetTargetIcon(int index) { return m_targetIcons[index]; }
 #endif
 
     protected:
         bool _addMember(ObjectGuid guid, const char* name, bool isAssistant = false);
-        bool _addMember(ObjectGuid guid, const char* name, bool isAssistant, uint8 group);
+        bool _addMember(ObjectGuid guid, const char* name, bool isAssistant, uint8 group, LFGRoleMask roles = LFG_ROLE_MASK_NONE);
         bool _removeMember(ObjectGuid guid);                // returns true if leader has changed
         void _chooseLeader(bool offline = false);
         void _setLeader(ObjectGuid guid);

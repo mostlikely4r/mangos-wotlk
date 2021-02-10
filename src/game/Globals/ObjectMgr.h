@@ -1149,6 +1149,11 @@ class ObjectMgr
             return m_DungeonEncounters.equal_range(creditEntry);
         }
 
+        DungeonEncounterMap const* GetDungeonEncounters()
+        {
+            return &m_DungeonEncounters;
+        }
+
         // check if an entry on some map have is an encounter
         bool IsEncounter(uint32 creditEntry, uint32 mapId) const;
 

@@ -524,6 +524,13 @@ struct AchievementCriteriaEntry
             uint32  killCount;                              // 4
         } honorable_kill;
 
+        // ACHIEVEMENT_CRITERIA_TYPE_USE_LFD_TO_GROUP_WITH_PLAYERS    = 119
+        struct
+        {
+            uint32  unused;                                 // 3
+            uint32  dungeonsComplete;                       // 4
+        } use_lfg;
+
         struct
         {
             uint32  value;                                  // 3        m_asset_id
@@ -1340,6 +1347,44 @@ struct ItemSetEntry
     uint32    items_to_triggerspell[8];                     // 43-50    m_setThreshold
     uint32    required_skill_id;                            // 51       m_requiredSkill
     uint32    required_skill_value;                         // 52       m_requiredSkillRank
+};
+
+struct LFGDungeonEntry
+{
+    uint32  ID;                                             // 0     m_ID
+    char*   name[16];                                       // 1-17  m_name_lang
+    uint32  minlevel;                                       // 18    m_minLevel
+    uint32  maxlevel;                                       // 19    m_maxLevel
+    uint32  reclevel;                                       // 20    m_target_level
+    uint32  recminlevel;                                    // 21    m_target_level_min
+    uint32  recmaxlevel;                                    // 22    m_target_level_max
+    uint32  map;                                            // 23    m_mapID
+    uint32  difficulty;                                     // 24    m_difficulty
+    uint32  flags;                                          // 25    m_flags
+    uint32  type;                                           // 26    m_typeID
+    uint32  faction;                                        // 27    m_faction
+    //char*   unk3;                                         // 28    m_textureFilename
+    uint32  expansion;                                      // 29    m_expansionLevel
+    uint32  index;                                          // 30    m_order_index
+    uint32  grouptype;                                      // 31    m_group_id
+    //char*   desc[16];                                     // 32-47 m_description_lang
+    //uint32 unk5                                           // 48 language flags?
+    // Helpers
+    uint32 Entry() const { return ID + (type << 24); }
+};
+
+struct LFGDungeonExpansionEntry
+{
+    uint32  ID;                                             // 0    m_ID
+    uint32  dungeonID;                                      // 1    m_lfg_id
+    uint32  expansion;                                      // 2    m_expansion_level
+    uint32  randomEntry;                                    // 3    m_random_id, inside of which is used this record
+    uint32  minlevelHard;                                   // 4    m_hard_level_min
+    uint32  maxlevelHard;                                   // 5    m_hard_level_max
+    uint32  minlevel;                                       // 6    m_target_level_min
+    uint32  maxlevel;                                       // 7    m_target_level_max
+    // Helpers
+    bool IsRandom() const { return randomEntry == 0; }
 };
 
 /*struct LfgDungeonsEntry

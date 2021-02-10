@@ -685,6 +685,9 @@ Player::~Player()
     // it must be unloaded already in PlayerLogout and accessed only for loggined player
     // m_social = nullptr;
 
+    if (GetObjectGuid())
+        sLFGMgr.RemoveLFGState(GetObjectGuid());
+
     // Note: buy back item already deleted from DB when player was saved
     for (auto& m_item : m_items)
     {
@@ -2906,6 +2909,9 @@ void Player::GiveLevel(uint32 level)
         MailDraft(mailReward->mailTemplateId).SendMailTo(this, MailSender(MAIL_CREATURE, mailReward->senderEntry));
 
     GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_REACH_LEVEL);
+
+    sLFGMgr.GetLFGPlayerState(GetObjectGuid())->Update();
+
 #ifdef BUILD_PLAYERBOT
     if (m_playerbotAI)
         m_playerbotAI->GiveLevel(level);
@@ -5414,6 +5420,18 @@ void Player::LeaveLFGChannel()
         if (m_channel->IsLFG())
         {
             m_channel->Leave(this);
+            break;
+        }
+    }
+}
+
+void Player::JoinLFGChannel()
+{
+    for (JoinedChannelsList::iterator i = m_channels.begin(); i != m_channels.end(); ++i)
+    {
+        if ((*i)->IsLFG())
+        {
+            (*i)->Join(this, "");
             break;
         }
     }
@@ -16837,6 +16855,12 @@ bool Player::LoadFromDB(ObjectGuid guid, SqlQueryHolder* holder)
 
     _LoadEquipmentSets(holder->GetResult(PLAYER_LOGIN_QUERY_LOADEQUIPMENTSETS));
 
+    sLFGMgr.CreateLFGState(GetObjectGuid());
+    if (!GetGroup() || !GetGroup()->isLFDGroup())
+    {
+        sLFGMgr.RemoveMemberFromLFDGroup(GetGroup(), GetObjectGuid());
+    }
+
     return true;
 }
 
@@ -17690,6 +17714,8 @@ void Player::_LoadGroup(QueryResult* result)
                 SetDungeonDifficulty(group->GetDungeonDifficulty());
                 SetRaidDifficulty(group->GetRaidDifficulty());
             }
+            if (group->isLFDGroup())
+                sLFGMgr.LoadLFDGroupPropertiesForPlayer(this);
         }
     }
 }
@@ -20663,8 +20689,9 @@ void Player::ToggleMetaGemsActive(uint8 exceptslot, bool apply)
     }
 }
 
-void Player::SetBattleGroundEntryPoint()
+void Player::SetBattleGroundEntryPoint(bool forLFG)
 {
+    m_bgData.forLFG = forLFG;
     // Taxi path store
     if (m_taxiTracker.GetState() >= Taxi::TRACKER_STANDBY)
     {
@@ -23744,7 +23771,7 @@ void Player::_SaveBGData()
 
     stmt.PExecute(GetGUIDLow());
 
-    if (m_bgData.bgInstanceID)
+    if (m_bgData.bgInstanceID || m_bgData.forLFG)
     {
         stmt = CharacterDatabase.CreateStatement(insBGData, "INSERT INTO character_battleground_data VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
         /* guid, bgInstanceID, bgTeam, x, y, z, o, map, taxi[0], taxi[1], mountSpell */
@@ -24380,6 +24407,37 @@ AreaLockStatus Player::GetAreaTriggerLockStatus(AreaTrigger const* at, Difficult
 
     return AREA_LOCKSTATUS_OK;
 };
+
+uint8 Player::GetTalentsCount(uint8 tab)
+{
+    if (tab > 2)
+        return 0;
+
+    if (m_cachedTC[tab] > 0)
+        return m_cachedTC[tab];
+
+    uint8 talentCount = 0;
+
+    uint32 const* talentTabIds = GetTalentTabPages(getClass());
+
+    uint32 talentTabId = talentTabIds[tab];
+
+    for (PlayerTalentMap::iterator iter = m_talents[m_activeSpec].begin(); iter != m_talents[m_activeSpec].end(); ++iter)
+    {
+        PlayerTalent talent = (*iter).second;
+
+        if (talent.state == PLAYERSPELL_REMOVED)
+            continue;
+
+        // skip another tab talents
+        if (talent.talentEntry->TalentTab != talentTabId)
+            continue;
+
+        talentCount += talent.currentRank + 1;
+    }
+    m_cachedTC[tab] = talentCount;
+    return talentCount;
+}
 
 float Player::ComputeRest(time_t timePassed, bool offline /*= false*/, bool inRestPlace /*= false*/) const
 {

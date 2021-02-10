@@ -1595,7 +1595,7 @@ void BattleGround::AddOrSetPlayerToCorrectBgGroup(Player* plr, ObjectGuid player
     }
     else                                                    // first player joined
     {
-        group = new Group;
+        group = new Group(GROUPTYPE_BG);
         SetBgRaid(team, group);
         group->Create(playerGuid, plr->GetName());
     }

@@ -168,7 +168,7 @@ void WorldSession::HandleGroupInviteOpcode(WorldPacket& recv_data)
     // at least one person joins
     if (!initiatorGroup)
     {
-        initiatorGroup = new Group();
+        initiatorGroup = new Group(GROUPTYPE_NORMAL);
         // new group: if can't add then delete
         if (!initiatorGroup->AddLeaderInvite(initiator))
         {
