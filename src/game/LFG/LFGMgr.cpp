@@ -713,7 +713,7 @@ LFGLockStatusType LFGMgr::GetPlayerLockStatus(Player* pPlayer, LFGDungeonEntry c
     if (dungeon->maxlevel < pPlayer->getLevel())
         return LFG_LOCKSTATUS_TOO_HIGH_LEVEL;
 
-    uint32 miscRequirement;
+    uint32 miscRequirement = 0;
     switch (pPlayer->GetAreaTriggerLockStatus(sObjectMgr.GetMapEntranceTrigger(dungeon->map), Difficulty(dungeon->difficulty), miscRequirement))
     {
     case AREA_LOCKSTATUS_OK:
@@ -2519,10 +2519,10 @@ bool LFGMgr::TryCreateGroup(LFGType type)
         LFGDungeonSet intersection;
         GuidSet newGroup;
         GuidSet const* applicants = &itr->second;
-        // playerbot mod
+#ifdef ENABLE_PLAYERBOTS
         for (int pass = 0; pass < 2; ++pass)
         {
-        // end of playerbot mod
+#endif
         for (GuidSet::const_iterator itr1 = applicants->begin(); itr1 != applicants->end(); ++itr1)
         {
             ObjectGuid guid = *itr1;
@@ -2547,9 +2547,9 @@ bool LFGMgr::TryCreateGroup(LFGType type)
 
             Player* player1 = sObjectMgr.GetPlayer(guid);
             if (player1 && player1->IsInWorld() &&
-                // playerbot mod
+#ifdef ENABLE_PLAYERBOTS
                 ((!pass && !player1->GetPlayerbotAI()) || pass)
-                // end of playerbot mod
+#endif
                 )
             {
                 rolesMap.insert(std::make_pair(player1->GetObjectGuid(), GetLFGPlayerState(player1->GetObjectGuid())->GetRoles()));
@@ -2580,11 +2580,11 @@ bool LFGMgr::TryCreateGroup(LFGType type)
                 break;
             }
         }
-        // playerbot mod
+#ifdef ENABLE_PLAYERBOTS
         if (!pass && newGroup.empty())
             break;
         }
-        // end of playerbot mod
+#endif
         DEBUG_LOG("LFGMgr:TryCreateGroup: Try create group to dungeon %u from " SIZEFMTD " players. result is %u", itr->first->ID, itr->second.size(), uint8(groupCreated));
         if (groupCreated)
         {
