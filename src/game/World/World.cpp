@@ -768,7 +768,7 @@ void World::LoadConfigSettings(bool reload)
     setConfig(CONFIG_BOOL_LFR_ENABLE, "LFR.Enable", false);
     setConfig(CONFIG_BOOL_LFG_DEBUG_ENABLE, "LFG.Debug", false);
     setConfig(CONFIG_BOOL_LFR_EXTEND, "LFR.Extend", false);
-    setConfig(CONFIG_BOOL_LFG_ONLYLASTENCOUNTER, "LFG.OnlyLastEncounterForCompleteDungeon", false);
+    setConfig(CONFIG_BOOL_LFG_ONLYLASTENCOUNTER, "LFG.OnlyLastEncounter", false);
     setConfigMinMax(CONFIG_UINT32_LFG_MAXKICKS, "LFG.MaxKicks", 5, 1, 10);
     std::string disabledMapIdForLFG = sConfig.GetStringDefault("LFG.DisableDungeonMapIds", "");
     setDisabledMapIdForDungeonFinder(disabledMapIdForLFG.c_str());
