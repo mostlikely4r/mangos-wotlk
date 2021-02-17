@@ -51,9 +51,8 @@ LFGMgr::LFGMgr()
     m_LFGQueueUpdateTimer.SetInterval(LFG_QUEUEUPDATE_INTERVAL);
     m_LFGQueueUpdateTimer.Reset();
 
-    // TEST
-    //for (LFGStatesMap::iterator itr = m_statesMap.begin(); itr != m_statesMap.end(); ++itr)
-    //    delete itr->second;
+    for (auto& itr : m_statesMap)
+        delete itr.second;
 }
 
 LFGMgr::~LFGMgr()
@@ -70,8 +69,8 @@ LFGMgr::~LFGMgr()
     m_searchMatrix.clear();
     m_eventList.clear();
 
-    for (LFGStatesMap::iterator itr = m_statesMap.begin(); itr != m_statesMap.end(); ++itr)
-        delete itr->second;
+    for (auto& itr : m_statesMap)
+        delete itr.second;
 }
 
 void LFGMgr::Update(uint32 uiDiff)
@@ -684,6 +683,8 @@ LFGLockStatusType LFGMgr::GetPlayerLockStatus(Player* pPlayer, LFGDungeonEntry c
 
     bool isRandom = (GetLFGPlayerState(pPlayer->GetObjectGuid())->GetType() == LFG_TYPE_RANDOM_DUNGEON);
 
+    bool isSaved = pPlayer->GetBoundInstance(dungeon->map, Difficulty(dungeon->difficulty)) != nullptr;
+
     // check if player in this dungeon. not need other checks
     //
     if (pPlayer->GetGroup() && pPlayer->GetGroup()->isLFDGroup())
@@ -703,8 +704,7 @@ LFGLockStatusType LFGMgr::GetPlayerLockStatus(Player* pPlayer, LFGDungeonEntry c
     if (dungeon->expansion > pPlayer->GetSession()->GetExpansion())
         return LFG_LOCKSTATUS_INSUFFICIENT_EXPANSION;
 
-    if (dungeon->difficulty > DUNGEON_DIFFICULTY_NORMAL
-        && pPlayer->GetBoundInstance(dungeon->map, Difficulty(dungeon->difficulty)))
+    if (dungeon->difficulty > DUNGEON_DIFFICULTY_NORMAL && isSaved)
         return  LFG_LOCKSTATUS_RAID_LOCKED;
 
     if (dungeon->minlevel > pPlayer->getLevel())
@@ -719,18 +719,20 @@ LFGLockStatusType LFGMgr::GetPlayerLockStatus(Player* pPlayer, LFGDungeonEntry c
     case AREA_LOCKSTATUS_OK:
         break;
     case AREA_LOCKSTATUS_TOO_LOW_LEVEL:
-        return  LFG_LOCKSTATUS_TOO_LOW_LEVEL;
+        return LFG_LOCKSTATUS_TOO_LOW_LEVEL;
     case AREA_LOCKSTATUS_QUEST_NOT_COMPLETED:
         return LFG_LOCKSTATUS_QUEST_NOT_COMPLETED;
     case AREA_LOCKSTATUS_MISSING_ITEM:
         return LFG_LOCKSTATUS_MISSING_ITEM;
-    case AREA_LOCKSTATUS_MISSING_DIFFICULTY:
-        return LFG_LOCKSTATUS_RAID_LOCKED;
+    //case AREA_LOCKSTATUS_MISSING_DIFFICULTY:
+    //    return LFG_LOCKSTATUS_TOO_LOW_LEVEL;
     case AREA_LOCKSTATUS_INSUFFICIENT_EXPANSION:
         return LFG_LOCKSTATUS_INSUFFICIENT_EXPANSION;
-    case AREA_LOCKSTATUS_NOT_ALLOWED:
-        return LFG_LOCKSTATUS_RAID_LOCKED;
+    //case AREA_LOCKSTATUS_NOT_ALLOWED:
+    //    return LFG_LOCKSTATUS_TOO_LOW_LEVEL;
     case AREA_LOCKSTATUS_RAID_LOCKED:
+        if (dungeon->type == LFG_TYPE_RAID && isSaved)
+            return LFG_LOCKSTATUS_RAID_LOCKED;
     case AREA_LOCKSTATUS_UNKNOWN_ERROR:
     default:
         return LFG_LOCKSTATUS_RAID_LOCKED;
@@ -2546,9 +2548,9 @@ bool LFGMgr::TryCreateGroup(LFGType type)
                 continue;
 
             Player* player1 = sObjectMgr.GetPlayer(guid);
-            if (player1 && player1->IsInWorld() &&
+            if (player1 && player1->IsInWorld()
 #ifdef ENABLE_PLAYERBOTS
-                ((!pass && !player1->GetPlayerbotAI()) || pass)
+                && ((!pass && !player1->GetPlayerbotAI()) || pass)
 #endif
                 )
             {
