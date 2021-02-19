@@ -18,6 +18,7 @@
 
 #include "CinematicMgr.h"
 #include "Entities/Player.h"
+#include "World/World.h"
 
 CinematicMgr::CinematicMgr(Player* playerref)
 {
@@ -88,6 +89,16 @@ void CinematicMgr::EndCinematic()
         if (WorldObject* vpObject = player->GetCamera().GetBody())
             if (vpObject == m_CinematicObject)
                 player->GetCamera().ResetView();
+
+        // create collector's edition reward
+        if (sWorld.getConfig(CONFIG_BOOL_COLLECTORS_EDITION))
+            if (player->HasAtLoginFlag(AT_LOGIN_FIRST))
+            {
+                player->CastSpell(player, 62456, TRIGGERED_OLD_TRIGGERED);
+            }
+
+        if (player->HasAtLoginFlag(AT_LOGIN_FIRST))
+            player->RemoveAtLoginFlag(AT_LOGIN_FIRST);
 
         m_CinematicObject->AddObjectToRemoveList();
     }

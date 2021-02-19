@@ -1010,9 +1010,6 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
         SendNotification("Your taxi nodes have been reset.");
     }
 
-    if (pCurrChar->HasAtLoginFlag(AT_LOGIN_FIRST))
-        pCurrChar->RemoveAtLoginFlag(AT_LOGIN_FIRST);
-
     // show time before shutdown if shutdown planned.
     if (sWorld.IsShutdowning())
         sWorld.ShutdownMsg(true, pCurrChar);
@@ -1042,6 +1039,16 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
 
     // Handle Login-Achievements (should be handled after loading)
     pCurrChar->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_ON_LOGIN, 1);
+
+    // create collector's edition reward
+    if (sWorld.getConfig(CONFIG_BOOL_COLLECTORS_EDITION))
+        if (pCurrChar->HasAtLoginFlag(AT_LOGIN_FIRST) && (!pCurrChar->m_cinematicMgr || (pCurrChar->m_cinematicMgr && !pCurrChar->m_cinematicMgr->GetActiveCinematicCamera())))
+        {
+            pCurrChar->CastSpell(pCurrChar, 62456, TRIGGERED_OLD_TRIGGERED);  // create Frosty's Collar
+        }
+
+    if (pCurrChar->HasAtLoginFlag(AT_LOGIN_FIRST) && ((!pCurrChar->m_cinematicMgr || (pCurrChar->m_cinematicMgr && !pCurrChar->m_cinematicMgr->GetActiveCinematicCamera())) && sWorld.getConfig(CONFIG_BOOL_COLLECTORS_EDITION)))
+        pCurrChar->RemoveAtLoginFlag(AT_LOGIN_FIRST);
 
     delete holder;
 }

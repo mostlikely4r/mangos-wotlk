@@ -773,6 +773,9 @@ void World::LoadConfigSettings(bool reload)
     std::string disabledMapIdForLFG = sConfig.GetStringDefault("LFG.DisableDungeonMapIds", "");
     setDisabledMapIdForDungeonFinder(disabledMapIdForLFG.c_str());
 
+    // Collector's Edition rewards
+    setConfig(CONFIG_BOOL_COLLECTORS_EDITION, "Custom.CollectorsEdition", false);
+
     setConfig(CONFIG_BOOL_OFFHAND_CHECK_AT_TALENTS_RESET, "OffhandCheckAtTalentsReset", false);
 
     setConfig(CONFIG_BOOL_KICK_PLAYER_ON_BAD_PACKET, "Network.KickOnBadPacket", false);
