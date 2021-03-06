@@ -3348,7 +3348,7 @@ bool Player::addSpell(uint32 spell_id, bool active, bool learning, bool dependen
             CharacterDatabase.PExecute("DELETE FROM character_spell WHERE spell = '%u'", spell_id);
         }
         else
-            sLog.outError("Player::addSpell: nonexistent in SpellStore spell #%u request.", spell_id);
+            sLog.outDetail("Player::addSpell: nonexistent in SpellStore spell #%u request.", spell_id);
 
         return false;
     }
