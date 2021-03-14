@@ -304,7 +304,8 @@ void Item::SaveToDB()
         case ITEM_CHANGED:
         {
             static SqlStatementID insItem;
-            SqlStatement stmt = CharacterDatabase.CreateStatement(insItem, uState == ITEM_NEW ?
+            static SqlStatementID updItem;
+            SqlStatement stmt = CharacterDatabase.CreateStatement(uState == ITEM_NEW ? insItem : updItem, uState == ITEM_NEW ?
                 "REPLACE INTO item_instance (owner_guid, itemEntry, creatorGuid, giftCreatorGuid, count, duration, charges, flags, enchantments, randomPropertyId, durability, playedTime, text, guid) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)" :
                 "UPDATE item_instance SET owner_guid = ?, itemEntry = ?, creatorGuid = ?, giftCreatorGuid = ?, count = ?, duration = ?, charges = ?, flags = ?, enchantments = ?, randomPropertyId = ?, durability = ?, playedTime = ?, text = ? WHERE guid = ?"
             );
