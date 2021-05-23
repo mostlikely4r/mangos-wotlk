@@ -13026,6 +13026,7 @@ void Spell::EffectSpiritHeal(SpellEffectIndex /*eff_idx*/)
         if (unitTarget->GetAreaId() != 4197)
             return;
 
+    ((Player*)unitTarget)->RemoveAurasDueToSpell(2584);
     ((Player*)unitTarget)->ResurrectPlayer(1.0f);
     ((Player*)unitTarget)->SpawnCorpseBones();
 }
