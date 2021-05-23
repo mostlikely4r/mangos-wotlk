@@ -522,13 +522,16 @@ void BattleGroundIC::HandleCreatureCreate(Creature* creature)
 
 void BattleGroundIC::HandleGameObjectCreate(GameObject* go)
 {
+    // add all objects in GO store
+    m_goEntryGuidStore[go->GetEntry()] = go->GetObjectGuid();
+
     switch (go->GetEntry())
     {
         case BG_IC_GO_SEAFORIUM_BOMBS_A:
-            m_seaforiumBombsGuids[TEAM_INDEX_ALLIANCE].push_back(go->GetObjectGuid());
+            m_seaforiumBombsGuids[TEAM_INDEX_ALLIANCE].insert(go->GetDbGuid());
             break;
         case BG_IC_GO_SEAFORIUM_BOMBS_H:
-            m_seaforiumBombsGuids[TEAM_INDEX_HORDE].push_back(go->GetObjectGuid());
+            m_seaforiumBombsGuids[TEAM_INDEX_HORDE].insert(go->GetDbGuid());
             break;
         case BG_IC_GO_PORTCULLIS_GATE_A:
             // sort each portculis gate, to use it later in script
@@ -578,53 +581,16 @@ void BattleGroundIC::HandleGameObjectCreate(GameObject* go)
             m_allianceInnerGate2Guid = go->GetObjectGuid();
             break;
         case BG_IC_GO_GUNSHIP_GROUND_PORTAL_A:
-            m_hangarPortalsGuids[TEAM_INDEX_ALLIANCE].push_back(go->GetObjectGuid());
+            m_hangarPortalsGuids[TEAM_INDEX_ALLIANCE].insert(go->GetDbGuid());
             break;
         case BG_IC_GO_GUNSHIP_GROUND_PORTAL_H:
-            m_hangarPortalsGuids[TEAM_INDEX_HORDE].push_back(go->GetObjectGuid());
+            m_hangarPortalsGuids[TEAM_INDEX_HORDE].insert(go->GetDbGuid());
             break;
         case BG_IC_GO_GUNSHIP_PORTAL_EFFECTS_A:
-            m_hangarAnimGuids[TEAM_INDEX_ALLIANCE].push_back(go->GetObjectGuid());
+            m_hangarAnimGuids[TEAM_INDEX_ALLIANCE].insert(go->GetDbGuid());
             break;
         case BG_IC_GO_GUNSHIP_PORTAL_EFFECTS_H:
-            m_hangarAnimGuids[TEAM_INDEX_HORDE].push_back(go->GetObjectGuid());
-            break;
-        case BG_IC_GO_BANNER_ALLIANCE_KEEP_A:
-        case BG_IC_GO_BANNER_ALLIANCE_KEEP_A_GREY:
-        case BG_IC_GO_BANNER_ALLIANCE_KEEP_H:
-        case BG_IC_GO_BANNER_ALLIANCE_KEEP_H_GREY:
-        case BG_IC_GO_BANNER_HORDE_KEEP_A:
-        case BG_IC_GO_BANNER_HORDE_KEEP_A_GREY:
-        case BG_IC_GO_BANNER_HORDE_KEEP_H:
-        case BG_IC_GO_BANNER_HORDE_KEEP_H_GREY:
-        case BG_IC_GO_BANNER_WORKSHOP_A:
-        case BG_IC_GO_BANNER_WORKSHOP_A_GREY:
-        case BG_IC_GO_BANNER_WORKSHOP_H:
-        case BG_IC_GO_BANNER_WORKSHOP_H_GREY:
-        case BG_IC_GO_BANNER_DOCKS_A:
-        case BG_IC_GO_BANNER_DOCKS_A_GREY:
-        case BG_IC_GO_BANNER_DOCKS_H:
-        case BG_IC_GO_BANNER_DOCKS_H_GREY:
-        case BG_IC_GO_BANNER_HANGAR_A:
-        case BG_IC_GO_BANNER_HANGAR_A_GREY:
-        case BG_IC_GO_BANNER_HANGAR_H:
-        case BG_IC_GO_BANNER_HANGAR_H_GREY:
-        case BG_IC_GO_BANNER_REFINERY_A:
-        case BG_IC_GO_BANNER_REFINERY_A_GREY:
-        case BG_IC_GO_BANNER_REFINERY_H:
-        case BG_IC_GO_BANNER_REFINERY_H_GREY:
-        case BG_IC_GO_BANNER_QUARRY_A:
-        case BG_IC_GO_BANNER_QUARRY_A_GREY:
-        case BG_IC_GO_BANNER_QUARRY_H:
-        case BG_IC_GO_BANNER_QUARRY_H_GREY:
-        case BG_IC_GO_BANNER_DOCKS:
-        case BG_IC_GO_BANNER_HANGAR:
-        case BG_IC_GO_BANNER_QUARRY:
-        case BG_IC_GO_BANNER_WORKSHOP:
-        case BG_IC_GO_BANNER_REFINERY:
-        case BG_IC_GO_GUNSHIP_A:
-        case BG_IC_GO_GUNSHIP_H:
-            m_goEntryGuidStore[go->GetEntry()] = go->GetObjectGuid();
+            m_hangarAnimGuids[TEAM_INDEX_HORDE].insert(go->GetDbGuid());
             break;
     }
 }
@@ -674,10 +640,10 @@ bool BattleGroundIC::CheckAchievementCriteriaMeet(uint32 criteria_id, Player con
 void BattleGroundIC::DoChangeBannerState(IsleObjective nodeId)
 {
     if (GameObject* oldBanner = GetSingleGameObjectFromStorage(m_isleNode[nodeId].oldBannerEntry))
-        ChangeBgObjectSpawnState(oldBanner->GetObjectGuid(), RESPAWN_ONE_DAY);
+        ChangeBgObjectSpawnState(oldBanner->GetDbGuid(), RESPAWN_ONE_DAY);
 
     if (GameObject* newBanner = GetSingleGameObjectFromStorage(m_isleNode[nodeId].currentBannerEntry))
-        ChangeBgObjectSpawnState(newBanner->GetObjectGuid(), RESPAWN_IMMEDIATELY);
+        ChangeBgObjectSpawnState(newBanner->GetDbGuid(), RESPAWN_IMMEDIATELY);
 }
 
 // Function that handles the completion of objective
@@ -758,8 +724,8 @@ void BattleGroundIC::DoApplyObjectiveBenefits(IsleObjective nodeId, GameObject* 
             }
 
             // respawn the workshop bombs and give them the right faction
-            for (const auto& guid : m_seaforiumBombsGuids[ownerIdx])
-                ChangeBgObjectSpawnState(guid, RESPAWN_IMMEDIATELY);
+            for (uint32 dbGuid : m_seaforiumBombsGuids[ownerIdx])
+                ChangeBgObjectSpawnState(dbGuid, RESPAWN_IMMEDIATELY);
 
             break;
         }
@@ -783,15 +749,15 @@ void BattleGroundIC::DoApplyObjectiveBenefits(IsleObjective nodeId, GameObject* 
         case BG_IC_OBJECTIVE_HANGAR:
         {
             // respawn portals
-            for (const auto& guid : m_hangarPortalsGuids[ownerIdx])
-                ChangeBgObjectSpawnState(guid, RESPAWN_IMMEDIATELY);
+            for (uint32 dbGuid : m_hangarPortalsGuids[ownerIdx])
+                ChangeBgObjectSpawnState(dbGuid, RESPAWN_IMMEDIATELY);
 
             // respawn and enable the animations
-            for (const auto& guid : m_hangarAnimGuids[ownerIdx])
+            for (uint32 dbGuid : m_hangarAnimGuids[ownerIdx])
             {
-                ChangeBgObjectSpawnState(guid, RESPAWN_IMMEDIATELY);
+                ChangeBgObjectSpawnState(dbGuid, RESPAWN_IMMEDIATELY);
 
-                if (GameObject* pAnim = GetBgMap()->GetGameObject(guid))
+                if (GameObject* pAnim = GetBgMap()->GetGameObject(dbGuid))
                     pAnim->UseDoorOrButton();
             }
 
@@ -883,8 +849,8 @@ void BattleGroundIC::DoResetObjective(IsleObjective nodeId)
         case BG_IC_OBJECTIVE_WORKSHOP:
         {
             // despwn bombs
-            for (const auto& guid : m_seaforiumBombsGuids[ownerIdx])
-                ChangeBgObjectSpawnState(guid, RESPAWN_ONE_DAY);
+            for (uint32 dbGuid : m_seaforiumBombsGuids[ownerIdx])
+                ChangeBgObjectSpawnState(dbGuid, RESPAWN_ONE_DAY);
 
             // despwn the vehicles if not already in use
             for (const auto& guid : m_isleNode[nodeId].creatureGuids)
@@ -935,15 +901,15 @@ void BattleGroundIC::DoResetObjective(IsleObjective nodeId)
         case BG_IC_OBJECTIVE_HANGAR:
         {
             // reset the animations and depswn the portals
-            for (const auto& guid : m_hangarPortalsGuids[ownerIdx])
-                ChangeBgObjectSpawnState(guid, RESPAWN_ONE_DAY);
+            for (uint32 dbGuid : m_hangarPortalsGuids[ownerIdx])
+                ChangeBgObjectSpawnState(dbGuid, RESPAWN_ONE_DAY);
 
-            for (const auto& guid : m_hangarAnimGuids[ownerIdx])
+            for (uint32 dbGuid : m_hangarAnimGuids[ownerIdx])
             {
-                ChangeBgObjectSpawnState(guid, RESPAWN_ONE_DAY);
-
-                if (GameObject* anim = GetBgMap()->GetGameObject(guid))
+                if (GameObject* anim = GetBgMap()->GetGameObject(dbGuid))
                     anim->ResetDoorOrButton();
+
+                ChangeBgObjectSpawnState(dbGuid, RESPAWN_ONE_DAY);
             }
 
             // stop the gunship
