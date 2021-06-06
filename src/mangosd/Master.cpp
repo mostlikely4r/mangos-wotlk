@@ -379,16 +379,7 @@ bool Master::_StartDB()
         CharacterDatabase.HaltDelayThread();
         return false;
     }
-#ifdef BUILD_PLAYERBOT
-    if (!CharacterDatabase.CheckRequiredField("playerbot_db_version", REVISION_DB_PLAYERBOTAI))
-    {
-        ///- Wait for already started DB delay threads to end
-        WorldDatabase.HaltDelayThread();
-        CharacterDatabase.HaltDelayThread();
-        return false;
-    }
-#endif
-//#ifdef ENABLE_PLAYERBOTS
+    
     /// Playerbot Database
     dbstring = sConfig.GetStringDefault("PlayerbotDatabaseInfo", "");
     nConnections = sConfig.GetIntDefault("PlayerbotDatabaseConnections", 1);
@@ -413,7 +404,6 @@ bool Master::_StartDB()
         WorldDatabase.HaltDelayThread();
         return false;
     }
-//#endif
 
     ///- Get login database info from configuration file
     dbstring = sConfig.GetStringDefault("LoginDatabaseInfo");

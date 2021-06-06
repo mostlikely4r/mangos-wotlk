@@ -795,13 +795,6 @@ void Spell::EffectDummy(SpellEffectIndex eff_idx)
         {
             switch (m_spellInfo->Id)
             {
-                case 2400:                                  // Transfer Powers
-                {
-                    if (unitTarget)
-                        m_caster->CastSpell(unitTarget, 26565, TRIGGERED_OLD_TRIGGERED);   // Heal Brethren
-
-                    return;
-                }
                 case 3360:                                  // Curse of the Eye
                 {
                     if (unitTarget)
@@ -4002,20 +3995,6 @@ void Spell::EffectDummy(SpellEffectIndex eff_idx)
 
                     return;
                 }
-                case 72202:                                 // Blood Link
-                {
-                    if (unitTarget)
-                        unitTarget->CastSpell(unitTarget, 72195, TRIGGERED_OLD_TRIGGERED);
-
-                    return;
-                }
-                case 72254:                                 // Mark of the Fallen Champion
-                {
-                    if (unitTarget && unitTarget->GetTypeId() == TYPEID_PLAYER && !unitTarget->HasAura(m_spellInfo->CalculateSimpleValue(eff_idx)))
-                        m_caster->CastSpell(unitTarget, m_spellInfo->CalculateSimpleValue(eff_idx), TRIGGERED_OLD_TRIGGERED);
-
-                    return;
-                }
                 case 72261:                                 // Delirious Slash
                 {
                     if (unitTarget)
@@ -4035,15 +4014,6 @@ void Spell::EffectDummy(SpellEffectIndex eff_idx)
                     if (unitTarget)
                         m_caster->CastSpell(unitTarget, m_spellInfo->CalculateSimpleValue(eff_idx), TRIGGERED_OLD_TRIGGERED);
 
-                    return;
-                }
-                case 74452:                                 // Conflagration
-                {
-                    if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER)
-                        return;
-
-                    m_caster->CastSpell(unitTarget, 74453, TRIGGERED_OLD_TRIGGERED);
-                    m_caster->CastSpell(unitTarget, 74454, TRIGGERED_OLD_TRIGGERED, nullptr, nullptr, m_caster->GetObjectGuid(), m_spellInfo);
                     return;
                 }
             }
@@ -4873,12 +4843,12 @@ void Spell::EffectClearQuest(SpellEffectIndex eff_idx)
     player->getQuestStatusMap()[quest_id].m_rewarded = false;
 }
 
-void Spell::EffectForceCast(SpellEffectIndex eff_idx)
+void Spell::EffectForceCast(SpellEffectIndex effIndex)
 {
     if (!unitTarget)
         return;
 
-    uint32 triggered_spell_id = m_spellInfo->EffectTriggerSpell[eff_idx];
+    uint32 triggered_spell_id = m_spellInfo->EffectTriggerSpell[effIndex];
 
     // normal case
     SpellEntry const* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(triggered_spell_id);
@@ -4891,23 +4861,38 @@ void Spell::EffectForceCast(SpellEffectIndex eff_idx)
 
     int32 basePoints = damage;
 
-    // forced cast spells by vehicle on master always unboard the master
-    if (m_caster->IsVehicle() && m_caster->GetVehicleInfo()->HasOnBoard(unitTarget) &&
-            m_spellInfo->EffectImplicitTargetA[eff_idx] == TARGET_UNIT_CASTER_MASTER)
+    SpellCastTargets targets;
+
+    switch (m_spellInfo->EffectImplicitTargetA[effIndex])
     {
-        if (sSpellTemplate.LookupEntry<SpellEntry>(basePoints))
-            m_caster->RemoveAurasDueToSpell(basePoints);
+        case TARGET_LOCATION_UNIT_MINION_POSITION: break; // confirmed by 31348 nothing is forwarded
+        default:
+            if (IsSpellRequireTarget(spellInfo))
+                targets.setUnitTarget(unitTarget);
+            break;
     }
 
-    Unit* target = unitTarget;
-    if (spellInfo->EffectImplicitTargetA[0] == TARGET_UNIT_CASTER_VEHICLE)
-        target = nullptr;
+    if (spellInfo->Targets & TARGET_FLAG_DEST_LOCATION)
+    {
+        if (m_targets.m_targetMask & TARGET_FLAG_DEST_LOCATION)
+        {
+            float x, y, z;
+            m_targets.getDestination(x, y, z);
+            targets.setDestination(x, y, z);
+        }
+        else if (unitTarget)
+        {
+            float x, y, z;
+            unitTarget->GetPosition(x, y, z);
+            targets.setDestination(x, y, z);
+        }
+    }
 
     // spell effect 141 needs to be cast as custom with basePoints
-    if (m_spellInfo->Effect[eff_idx] == SPELL_EFFECT_FORCE_CAST_WITH_VALUE)
-        unitTarget->CastCustomSpell(target, spellInfo, &basePoints, &basePoints, &basePoints, TRIGGERED_OLD_TRIGGERED, nullptr, nullptr, ObjectGuid(), m_spellInfo);
+    if (m_spellInfo->Effect[effIndex] == SPELL_EFFECT_FORCE_CAST_WITH_VALUE)
+        unitTarget->CastCustomSpell(targets, spellInfo, &basePoints, &basePoints, &basePoints, TRIGGERED_OLD_TRIGGERED, nullptr, nullptr, ObjectGuid(), m_spellInfo);
     else
-        unitTarget->CastSpell(target, spellInfo, TRIGGERED_OLD_TRIGGERED, nullptr, nullptr, ObjectGuid(), m_spellInfo);
+        unitTarget->CastSpell(targets, spellInfo, TRIGGERED_OLD_TRIGGERED, nullptr, nullptr, ObjectGuid(), m_spellInfo);
 }
 
 void Spell::EffectTriggerSpell(SpellEffectIndex effIndex)
@@ -4929,12 +4914,7 @@ void Spell::EffectTriggerSpell(SpellEffectIndex effIndex)
         case 29950:
             m_caster->RemoveAurasDueToSpellByCancel(29947);
             return;
-        case 41967:                                         // Priest Shadowfiend (34433) need apply mana gain trigger aura on pet
-        {
-            if (Unit* pet = unitTarget->GetPet())
-                pet->CastSpell(pet, 28305, TRIGGERED_OLD_TRIGGERED);
-            return;
-        }
+        case 41967: // Priest Shadowfiend (34433) - handled in spell script
         case 47531: // Dismiss pet - suppress error
             return;
         case 53258:                                         // Empower Rune Weapon
@@ -5835,6 +5815,8 @@ void Spell::EffectPersistentAA(SpellEffectIndex eff_idx)
 
     caster->AddDynObject(dynObj);
     caster->GetMap()->Add(dynObj);
+    if (GenericTransport* transport = caster->GetTransport())
+        transport->AddPassenger(dynObj, true);
 
     // Potential Hack - at the time of channel start Dynamic Object is not created yet, so have to do it here
     // Sent in next Object Update so for client its the same
@@ -5863,7 +5845,7 @@ void Spell::EffectEnergize(SpellEffectIndex eff_idx)
     switch (m_spellInfo->Id)
     {
         case 5530:
-            if (m_caster->getClass() == CLASS_ROGUE)        // Warrior and rogue use same spell, on rogue not supposed to give resource, WTF blizzard
+            if (m_caster->getClass() == CLASS_ROGUE) // Warrior and rogue use same spell, on rogue not supposed to give resource, WTF game devs?!
                 return;
             break;
         case 9512:                                          // Restore Energy
@@ -7298,6 +7280,8 @@ void Spell::EffectAddFarsight(SpellEffectIndex eff_idx)
 
     m_caster->AddDynObject(dynObj);
     m_caster->GetMap()->Add(dynObj);
+    if (GenericTransport* transport = m_caster->GetTransport())
+        transport->AddPassenger(dynObj, true);
 
     ((Player*)m_caster)->GetCamera().SetView(dynObj);
 }
@@ -10485,15 +10469,6 @@ void Spell::EffectScriptEffect(SpellEffectIndex eff_idx)
                     }
                     return;
                 }
-                case 52751:                                 // Death Gate
-                {
-                    if (!unitTarget || unitTarget->getClass() != CLASS_DEATH_KNIGHT)
-                        return;
-
-                    // triggered spell is stored in m_spellInfo->EffectBasePoints[0]
-                    unitTarget->CastSpell(unitTarget, damage, TRIGGERED_NONE);
-                    break;
-                }
                 case 52941:                                 // Song of Cleansing
                 {
                     uint32 spellId = 0;
@@ -11086,30 +11061,6 @@ void Spell::EffectScriptEffect(SpellEffectIndex eff_idx)
                     unitTarget->CastSpell(unitTarget, 67729, TRIGGERED_NONE);
                     return;
                 }
-                case 69057:                                 // Bone Spike Graveyard
-                {
-                    if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER || unitTarget->HasAura(m_spellInfo->CalculateSimpleValue(EFFECT_INDEX_1)))
-                        return;
-
-                    unitTarget->CastSpell(unitTarget, 69062, TRIGGERED_OLD_TRIGGERED);
-                    return;
-                }
-                case 69140:                                 // Coldflame (random target selection)
-                {
-                    if (!unitTarget)
-                        return;
-
-                    m_caster->CastSpell(unitTarget, m_spellInfo->CalculateSimpleValue(eff_idx), TRIGGERED_OLD_TRIGGERED);
-                    return;
-                }
-                case 69147:                                 // Coldflame
-                {
-                    if (!unitTarget)
-                        return;
-
-                    unitTarget->CastSpell(unitTarget, m_spellInfo->CalculateSimpleValue(eff_idx), TRIGGERED_OLD_TRIGGERED);
-                    return;
-                }
                 case 69195:                                 // Pungent Blight
                 {
                     if (!unitTarget)
@@ -11294,50 +11245,6 @@ void Spell::EffectScriptEffect(SpellEffectIndex eff_idx)
                     return;
                 }
                 case 72409:                                 // Rune of Blood
-                {
-                    if (!unitTarget)
-                        return;
-
-                    unitTarget->CastSpell(m_caster, m_spellInfo->CalculateSimpleValue(eff_idx), TRIGGERED_OLD_TRIGGERED);
-                    return;
-                }
-                case 72705:                                 // Coldflame (summon around the caster)
-                {
-                    if (!unitTarget)
-                        return;
-
-                    // Cast summon spells 72701, 72702, 72703, 72704
-                    for (uint32 triggeredSpell = m_spellInfo->CalculateSimpleValue(eff_idx); triggeredSpell < m_spellInfo->Id; ++triggeredSpell)
-                        unitTarget->CastSpell(unitTarget, triggeredSpell, TRIGGERED_OLD_TRIGGERED);
-
-                    return;
-                }
-                case 72900:                                 // Start Halls of Reflection Quest AE
-                {
-                    if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER)
-                        return;
-
-                    if (Player* target = (Player*)unitTarget)
-                        target->CastSpell(target, target->GetTeam() == ALLIANCE ? 71351 : 71542, TRIGGERED_OLD_TRIGGERED);
-                    return;
-                }
-                case 73142:                                 // Bone Spike Graveyard (during storm)
-                {
-                    if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER || unitTarget->HasAura(69065))
-                        return;
-
-                    uint32 spellId = 0;
-                    switch (urand(0, 2))
-                    {
-                        case 0: spellId = 69062; break;
-                        case 1: spellId = 72669; break;
-                        case 2: spellId = 72670; break;
-                    }
-
-                    unitTarget->CastSpell(unitTarget, spellId, TRIGGERED_OLD_TRIGGERED);
-                    return;
-                }
-                case 74455:                                 // Conflagration
                 {
                     if (!unitTarget)
                         return;
@@ -12385,7 +12292,10 @@ void Spell::EffectResurrect(SpellEffectIndex eff_idx)
         player = static_cast<Player*>(unitTarget);
     }
 
-    m_spellLog.AddLog(uint32(m_spellInfo->Effect[eff_idx]), unitTarget->GetPackGUID());
+    if (unitTarget)
+        m_spellLog.AddLog(uint32(m_spellInfo->Effect[eff_idx]), unitTarget->GetPackGUID());
+    else if (corpseTarget)
+        m_spellLog.AddLog(uint32(m_spellInfo->Effect[eff_idx]), corpseTarget->GetPackGUID());
 
     Player::QueueOrAddResurrectRequest(corpseTarget, m_caster, player, m_spellInfo, damage, eff_idx, false);
 }
@@ -12430,7 +12340,7 @@ void Spell::EffectLeapBack(SpellEffectIndex eff_idx)
     if (unitTarget->IsTaxiFlying())
         return;
 
-    m_caster->KnockBackFrom(unitTarget, float(m_spellInfo->EffectMiscValue[eff_idx]) / 10, float(damage) / 10);
+    unitTarget->KnockBackFrom(m_caster, float(m_spellInfo->EffectMiscValue[eff_idx]) / 10, float(damage) / 10);
 }
 
 void Spell::EffectReputation(SpellEffectIndex eff_idx)
@@ -12631,6 +12541,8 @@ void Spell::EffectPullTowards(SpellEffectIndex eff_idx)
     {
         z = m_caster->GetPositionZ();
         dist = unitTarget->GetDistance(m_caster, false);
+        x = m_caster->GetPositionX();
+        y = m_caster->GetPositionY();
     }
     else // SPELL_EFFECT_PULL_TOWARDS_DEST
     {
@@ -12648,8 +12560,9 @@ void Spell::EffectPullTowards(SpellEffectIndex eff_idx)
     float speedXY = float(m_spellInfo->EffectMiscValue[eff_idx]) * 0.1f;
     float time = dist / speedXY;
     float speedZ = ((z - unitTarget->GetPositionZ()) + 0.5f * time * time * Movement::gravity) / time;
+    float angle = unitTarget->GetAngle(x, y);
 
-    unitTarget->KnockBackFrom(m_caster, -speedXY, speedZ);
+    unitTarget->KnockBackWithAngle(angle, speedXY, speedZ);
 }
 
 void Spell::EffectSummonDeadPet(SpellEffectIndex /*eff_idx*/)
@@ -13429,7 +13342,7 @@ void Spell::EffectQuestOffer(SpellEffectIndex eff_idx)
         Player* player = (Player*)unitTarget;
 
         if (player->CanTakeQuest(quest, false))
-            player->PlayerTalkClass->SendQuestGiverQuestDetails(quest, player->GetObjectGuid(), true);
+            player->GetPlayerMenu()->SendQuestGiverQuestDetails(quest, player->GetObjectGuid(), true);
     }
 }
 

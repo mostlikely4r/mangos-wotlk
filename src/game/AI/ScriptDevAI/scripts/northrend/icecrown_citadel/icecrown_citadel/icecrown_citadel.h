@@ -44,24 +44,59 @@ enum
     NPC_LICH_KING                   = 36597,
 
     // boss-related and other NPCs
-    NPC_DEATHWHISPER_SPAWN_STALKER  = 37947,
+    NPC_COLDFLAME                   = 36672,
+
+    NPC_DEATHWHISPER_SPAWN_STALKER  = 37947,        // Lady Deathwhisper stalkers
     NPC_DEATHWHISPER_CONTROLLER     = 37948,
-    NPC_OVERLORD_SAURFANG           = 37187,
-    NPC_KORKRON_REAVER              = 37920,
-    NPC_MURADIN_BRONZEBEARD         = 37200,        // Saurfang's encounter and at the instance entrance
-    NPC_SKYBREAKER_MARINE           = 37830,
-    NPC_ALLIANCE_MARINE             = 37830,
+
+    NPC_CULT_FANATIC                = 37890,        // Deathwhisper cultists
+    NPC_CULT_ADHERENT               = 37949,
+    NPC_DEFORMED_FANATIC            = 38135,
+    NPC_EMPOWERED_ADHERENT          = 38136,
+    NPC_REANIMATED_FANATIC          = 38009,
+    NPC_REANIMATED_ADHERENT         = 38010,
+
+    NPC_SPIRE_FROSTWYRM             = 37230,        // Frostwyrm on the Rampart
+
+    NPC_GUNSHIP_SAURFANG            = 36939,        // Gunship npcs
+    NPC_GUNSHIP_MURADIN             = 36948,
+    NPC_SKYBREAKER                  = 37540,        // actual ships that will take the damage
+    NPC_ORGRIMS_HAMMER              = 37215,
+    NPC_GUNSHIP_HULL                = 37547,
+    NPC_TELEPORT_PORTAL             = 37227,        // spawned on enemy ship as a source to teleport soldiers
+    NPC_TELEPORT_EXIT               = 37488,        // spawned on player ship as a target to teleport soldiers
+
+    NPC_SKYBREAKER_SORCERER         = 37116,        // Gunship soldiers
+    NPC_SKYBREAKER_RIFLEMAN         = 36969,
+    NPC_SKYBREAKER_MORTAR_SOLDIER   = 36978,
+    NPC_SKYBREAKER_MARINE           = 36950,
+    NPC_SKYBREAKER_SERGEANT         = 36961,
+    NPC_KORKRON_BATTLE_MAGE         = 37117,
+    NPC_KORKRON_AXETHROWER          = 36968,
+    NPC_KORKRON_ROCKETEER           = 36982,
+    NPC_KORKRON_REAVER              = 36957,
+    NPC_KORKRON_SERGEANT            = 36960,
+
+    NPC_OVERLORD_SAURFANG           = 37187,        // Saurfang intro / outro
+    NPC_KORKRON_REAVER_RISE         = 37920,
+    NPC_MURADIN_BRONZEBEARD         = 37200,
+    NPC_SKYBREAKER_MARINE_RISE      = 37830,
+    // Note: additional to these on the Alliance side there are also the following used: 37879, 37188, 37880
+
+    NPC_FROST_FREEZE_TRAP           = 37744,
+
     NPC_BLOOD_ORB_CONTROL           = 38008,
     NPC_PUTRICIDES_TRAP             = 38879,        // Handles trap event before Putricide
     NPC_GAS_STALKER                 = 36659,        // Handles the gas in Festergut room
     NPC_MAD_SCIENTIST_STALKER       = 37824,        // Putricide stalkers
     NPC_LANATHEL_INTRO              = 38004,
+
     NPC_VALITHRIA_QUEST             = 38589,
     NPC_VALITHRIA_COMBAT_TRIGGER    = 38752,
-    NPC_MURADIN                     = 36948,        // Gunship Battle's encounter(?)
-    NPC_TIRION                      = 38995,
-    NPC_MENETHIL                    = 38579,
-    NPC_SPIRE_FROSTWYRM             = 37230,
+
+    NPC_TIRION_FORDRING             = 38995,        // Lich King event creatures
+    NPC_TENERAS_MENETHIL            = 38579,
+
     NPC_FROSTMOURNE_TRIGGER         = 38584,
     NPC_FROSTMOURNE_HOLDER          = 27880,
     NPC_STINKY                      = 37025,
@@ -71,14 +106,6 @@ enum
     NPC_SPINESTALKER                = 37534,
     NPC_OOZE_TENTACLE_STALKER       = 38308,        // accessories to Putricide
     NPC_SLIMY_TENTACLE_STALKER      = 38309,
-
-    // Deathwhisper cultists
-    NPC_CULT_FANATIC                = 37890,
-    NPC_CULT_ADHERENT               = 37949,
-    NPC_DEFORMED_FANATIC            = 38135,
-    NPC_EMPOWERED_ADHERENT          = 38136,
-    NPC_REANIMATED_FANATIC          = 38009,
-    NPC_REANIMATED_ADHERENT         = 38010,
 
     // Blood wing entrance creatures
     NPC_DARFALLEN_NOBLE             = 37663,
@@ -113,6 +140,8 @@ enum
     GO_ZEPPELIN_HORDE               = 201834,       // ship used during the Saurfang event; map 718
 
     GO_SAURFANG_DOOR                = 201825,
+    GO_HORDE_TELEPORTER             = 201880,       // dummy objects; spawned on the Deathbringers rise
+    GO_ALLIANCE_TELEPORTER          = 201858,
 
     GO_GREEN_PLAGUE                 = 201370,       // Rotface combat door
     GO_ORANGE_PLAGUE                = 201371,       // Festergut combat door
@@ -272,6 +301,27 @@ enum
     ACHIEV_CRIT_NECK_DEEP_VILE_25H         = 13164,
 };
 
+struct sEventNpcSingleSpawnLocations
+{
+    uint32 uiEntry;
+    float fSpawnX, fSpawnY, fSpawnZ, fSpawnO;
+};
+
+struct sEventNpcDualSpawnLocations
+{
+    uint32 uiEntryHorde, uiEntryAlliance;
+    float fSpawnX, fSpawnY, fSpawnZ, fSpawnO;
+};
+
+const sEventNpcDualSpawnLocations aSaurfangLocations[5] =
+{
+    {NPC_OVERLORD_SAURFANG,     NPC_MURADIN_BRONZEBEARD,      -555.958f, 2211.4f,  539.369f, 6.26573f},
+    {NPC_KORKRON_REAVER_RISE,   NPC_SKYBREAKER_MARINE_RISE,   -560.399f, 2209.3f,  539.368f, 6.23082f},
+    {NPC_KORKRON_REAVER_RISE,   NPC_SKYBREAKER_MARINE_RISE,   -557.936f, 2214.46f, 539.368f, 6.26573f},
+    {NPC_KORKRON_REAVER_RISE,   NPC_SKYBREAKER_MARINE_RISE,   -557.958f, 2207.16f, 539.368f, 6.26573f},
+    {NPC_KORKRON_REAVER_RISE,   NPC_SKYBREAKER_MARINE_RISE,   -560.451f, 2212.86f, 539.368f, 6.17846f},
+};
+
 class instance_icecrown_citadel : public ScriptedInstance, private DialogueHelper
 {
     public:
@@ -283,6 +333,8 @@ class instance_icecrown_citadel : public ScriptedInstance, private DialogueHelpe
         void OnPlayerEnter(Player* pPlayer) override;
         void OnCreatureCreate(Creature* pCreature) override;
         void OnObjectCreate(GameObject* pGo) override;
+        void OnCreatureRespawn(Creature* pCreature) override;
+        void OnObjectSpawn(GameObject* pGo) override;
 
         void OnCreatureEnterCombat(Creature* pCreature) override;
         void OnCreatureDeath(Creature* pCreature) override;
@@ -311,12 +363,18 @@ class instance_icecrown_citadel : public ScriptedInstance, private DialogueHelpe
         void SetSpecialAchievementCriteria(uint32 uiType, bool bIsMet);
         bool CheckAchievementCriteriaMeet(uint32 uiCriteriaId, Player const* pSource, Unit const* pTarget = nullptr, uint32 uiMiscvalue1 = 0) const override;
 
+        bool CheckConditionCriteriaMeet(Player const* source, uint32 instance_condition_id, WorldObject const* conditionSource, uint32 conditionSourceType) const override;
+
         void Update(const uint32 diff) override;
 
         void ShowChatCommands(ChatHandler* handler) override;
         void ExecuteChatCommand(ChatHandler* handler, char* args) override;
 
     private:
+        void JustDidDialogueStep(int32 iEntry) override;
+
+        void ProcessEventNpcs(Player* pPlayer);
+
         std::string m_strInstData;
         uint32 m_auiEncounter[MAX_ENCOUNTER];
         bool m_abAchievCriteria[MAX_SPECIAL_ACHIEV_CRITS];
@@ -335,6 +393,7 @@ class instance_icecrown_citadel : public ScriptedInstance, private DialogueHelpe
         GuidList m_lDeathwhisperStalkersGuids;
         GuidList m_lDeathwhisperCultistsGuids;
         GuidList m_lRotfaceUpperStalkersGuids;
+        GuidList m_lFactionTeleporterGuids[PVP_TEAM_COUNT];
         GuidSet m_sDarkfallenCreaturesLowerGuids;
         GuidSet m_sDarkfallenCreaturesLeftGuids;
         GuidSet m_sDarkfallenCreaturesRightGuids;

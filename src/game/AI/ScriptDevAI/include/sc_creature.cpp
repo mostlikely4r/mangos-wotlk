@@ -329,14 +329,23 @@ CreatureList ScriptedAI::DoFindFriendlyCC(float range)
     return creatureList;
 }
 
-CreatureList ScriptedAI::DoFindFriendlyMissingBuff(float range, uint32 spellId)
+CreatureList ScriptedAI::DoFindFriendlyMissingBuff(float range, uint32 spellId, bool inCombat)
 {
     CreatureList creatureList;
+    
+    if (inCombat == false)
+    {
+        MaNGOS::FriendlyMissingBuffInRangeInCombatCheck u_check(m_creature, range, spellId);
+        MaNGOS::CreatureListSearcher<MaNGOS::FriendlyMissingBuffInRangeInCombatCheck> searcher(creatureList, u_check);
+        Cell::VisitGridObjects(m_creature, searcher, range);
+    }
+    else if (inCombat == true)
+    {
+        MaNGOS::FriendlyMissingBuffInRangeNotInCombatCheck u_check(m_creature, range, spellId);
+        MaNGOS::CreatureListSearcher<MaNGOS::FriendlyMissingBuffInRangeNotInCombatCheck> searcher(creatureList, u_check);
 
-    MaNGOS::FriendlyMissingBuffInRangeCheck u_check(m_creature, range, spellId);
-    MaNGOS::CreatureListSearcher<MaNGOS::FriendlyMissingBuffInRangeCheck> searcher(creatureList, u_check);
-
-    Cell::VisitGridObjects(m_creature, searcher, range);
+        Cell::VisitGridObjects(m_creature, searcher, range);
+    }    
 
     return creatureList;
 }
@@ -362,13 +371,13 @@ void ScriptedAI::SetEquipmentSlots(bool loadDefault, int32 mainHand, int32 offHa
     }
 
     if (mainHand >= 0)
-    { 
+    {
         m_creature->SetVirtualItem(VIRTUAL_ITEM_SLOT_0, mainHand);
-        m_creature->UpdateDamagePhysical(BASE_ATTACK);            
+        m_creature->UpdateDamagePhysical(BASE_ATTACK);
     }
 
     if (offHand >= 0)
-    { 
+    {
         m_creature->SetVirtualItem(VIRTUAL_ITEM_SLOT_1, offHand);
         if(offHand == 1)
             m_creature->SetCanDualWield(true);
@@ -397,9 +406,7 @@ enum
     NPC_HALAZZI                 = 23577,
     NPC_MALACRASS               = 24239,
 
-    NPC_ANUBARAK                = 29120,
     NPC_SINDRAGOSA              = 36853,
-    NPC_ZARITHRIAN              = 39746,
 };
 
 bool ScriptedAI::EnterEvadeIfOutOfCombatArea(const uint32 diff)
@@ -436,16 +443,8 @@ bool ScriptedAI::EnterEvadeIfOutOfCombatArea(const uint32 diff)
             if (x < 270.0f && x > 185.0f)
                 return false;
             break;
-        case NPC_ANUBARAK:
-            if (y < 281.0f && y > 228.0f)
-                return false;
-            break;
         case NPC_SINDRAGOSA:
             if (x > 4314.0f)
-                return false;
-            break;
-        case NPC_ZARITHRIAN:
-            if (z > 87.0f)
                 return false;
             break;
         case NPC_AKILZON:
