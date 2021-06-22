@@ -892,6 +892,7 @@ void BattleGroundAV::Reset()
 
         m_enemyTowersDestroyed[i] = 0;
         m_homeTowersControlled[i] = BG_AV_MAX_TOWERS_PER_TEAM;
+        m_activeEvents[BG_AV_NODE_CAPTAIN_DEAD_A + i] = BG_EVENT_NONE;
     }
 
     // initialize mine variables and active events
@@ -910,7 +911,7 @@ void BattleGroundAV::Reset()
     m_activeEvents[BG_AV_BOSS_A] = 0;
     m_activeEvents[BG_AV_BOSS_H] = 0;
 
-    for (uint8 i = 0; i < BG_AV_MAX_NODES; ++i)  // towers
+    for (uint8 i = BG_AV_NODES_DUNBALDAR_SOUTH; i < BG_AV_MAX_NODES; ++i)  // towers
         m_activeEvents[BG_AV_MARSHAL_A_SOUTH + i - BG_AV_NODES_DUNBALDAR_SOUTH] = 0;
 
     // initialize all nodes
