@@ -1795,7 +1795,7 @@ void Spell::EffectDummy(SpellEffectIndex eff_idx)
                 }
                 case 28697:                                 // Forgiveness
                 {
-                    unitTarget->CastSpell(nullptr, 3617, TRIGGERED_OLD_TRIGGERED); // guessed suicide spell
+                    unitTarget->CastSpell(nullptr, 29266, TRIGGERED_OLD_TRIGGERED); // guessed permanent feign death spell
                     return;
                 }
                 case 29126:                                 // Cleansing Flames (Darnassus)
@@ -8694,19 +8694,6 @@ void Spell::EffectScriptEffect(SpellEffectIndex eff_idx)
                     uint32 spells[3] = {26206, 26207, 45036};
 
                     m_caster->CastSpell(unitTarget, spells[urand(0, 2)], TRIGGERED_OLD_TRIGGERED);
-                    return;
-                }
-                case 26275:                                 // PX-238 Winter Wondervolt TRAP
-                {
-                    uint32 spells[4] = {26272, 26157, 26273, 26274};
-
-                    // check presence
-                    for (unsigned int spell : spells)
-                        if (unitTarget->HasAura(spell, EFFECT_INDEX_0))
-                            return;
-
-                    // cast
-                    unitTarget->CastSpell(unitTarget, spells[urand(0, 3)], TRIGGERED_OLD_TRIGGERED);
                     return;
                 }
                 case 26465:                                 // Mercurial Shield - need remove one 26464 Mercurial Shield aura
