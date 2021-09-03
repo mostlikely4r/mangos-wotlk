@@ -1112,7 +1112,7 @@ void LFGMgr::SendLFGReward(Player* pPlayer, LFGDungeonEntry const* pRandomDungeo
     }
 
     // we give reward without informing client (retail does this)
-    pPlayer->RewardQuest(qReward, 0, NULL, false);
+    pPlayer->RewardQuest(qReward, 0, pPlayer, false);
 
     // Give rewards
     DEBUG_LOG("LFGMgr::RewardDungeonDoneFor: %u done dungeon %u, %s previously done.", pPlayer->GetObjectGuid().GetCounter(), pRandomDungeon->ID, index > 0 ? " " : " not");
