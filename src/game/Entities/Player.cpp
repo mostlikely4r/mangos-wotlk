@@ -18882,8 +18882,14 @@ void Player::_SaveStats()
 
     stmt = CharacterDatabase.CreateStatement(insertStats, "INSERT INTO character_stats (guid, maxhealth, maxpower1, maxpower2, maxpower3, maxpower4, maxpower5, maxpower6, maxpower7, "
             "strength, agility, stamina, intellect, spirit, armor, resHoly, resFire, resNature, resFrost, resShadow, resArcane, "
-            "blockPct, dodgePct, parryPct, critPct, rangedCritPct, spellCritPct, attackPower, rangedAttackPower, spellPower) "
-            "VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            "blockPct, dodgePct, parryPct, critPct, rangedCritPct, spellCritPct, attackPower, rangedAttackPower, spellPower, "
+            "holyCritPct, fireCritPct, natureCritPct, frostCritPct, shadowCritPct, arcaneCritPct, "
+            "attackPowerMod, rangedAttackPowerMod, holyDamage, fireDamage, natureDamage, frostDamage, shadowDamage, arcaneDamage, healBonus, "
+            "defenseRating, dodgeRating, parryRating, blockRating, resilience, "
+            "meleeHitRating, rangedHitRating, spellHitRating, meleeCritRating, rangedCritRating, spellCritRating, meleeHasteRating, rangedHasteRating, spellHasteRating, "
+            "expertise, expertiseRating, "
+            "mainHandDamageMin, mainHandDamageMax, mainHandSpeed, offHandDamageMin, offHandDamageMax, offHandSpeed, rangedDamageMin, rangedDamageMax, rangedSpeed, manaRegen, manaInterrupt, pvpRank) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     stmt.addUInt32(GetGUIDLow());
     stmt.addUInt32(GetMaxHealth());
@@ -18903,6 +18909,74 @@ void Player::_SaveStats()
     stmt.addUInt32(GetUInt32Value(UNIT_FIELD_ATTACK_POWER));
     stmt.addUInt32(GetUInt32Value(UNIT_FIELD_RANGED_ATTACK_POWER));
     stmt.addUInt32(GetBaseSpellPowerBonus());
+
+    // new stats
+    // spell crits
+    for (int i = SPELL_SCHOOL_HOLY; i < MAX_SPELL_SCHOOL; ++i)
+        stmt.addFloat(m_modSpellCritChance[i]);
+
+    // attack power mods
+    stmt.addUInt32(GetUInt32Value(UNIT_FIELD_ATTACK_POWER_MODS));
+    stmt.addUInt32(GetUInt32Value(UNIT_FIELD_RANGED_ATTACK_POWER_MODS));
+
+    // spell damage
+    for (int i = SPELL_SCHOOL_HOLY; i < MAX_SPELL_SCHOOL; ++i)
+        stmt.addInt32(SpellBaseDamageBonusDone(SpellSchoolMask(1 << i)));
+
+    // healing bonus
+    stmt.addInt32(SpellBaseHealingBonusDone(SPELL_SCHOOL_MASK_ALL));
+
+    // defense rating
+    stmt.addInt32(GetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + CR_DEFENSE_SKILL));
+
+    // dodge bonus
+    stmt.addInt32(GetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + CR_DODGE));
+
+    // parry Rating
+    stmt.addInt32(GetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + CR_PARRY));
+
+    // block rating
+    stmt.addInt32(GetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + CR_BLOCK));
+
+    // resilience
+    stmt.addInt32(GetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + CR_CRIT_TAKEN_MELEE));
+
+    // ratings
+    stmt.addInt32(GetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + CR_HIT_MELEE));
+    stmt.addInt32(GetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + CR_HIT_RANGED));
+    stmt.addInt32(GetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + CR_HIT_SPELL));
+    stmt.addInt32(GetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + CR_CRIT_MELEE));
+    stmt.addInt32(GetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + CR_CRIT_RANGED));
+    stmt.addInt32(GetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + CR_CRIT_SPELL));
+
+    stmt.addInt32(GetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + CR_HASTE_MELEE));
+    stmt.addInt32(GetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + CR_HASTE_RANGED));
+    stmt.addInt32(GetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + CR_HASTE_SPELL));
+    stmt.addInt32(GetUInt32Value(PLAYER_EXPERTISE));
+    stmt.addInt32(GetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + CR_EXPERTISE));
+
+    // weapon damage
+    // main hand
+    stmt.addFloat(GetFloatValue(UNIT_FIELD_MINDAMAGE));
+    stmt.addFloat(GetFloatValue(UNIT_FIELD_MAXDAMAGE));
+    stmt.addFloat(GetAPMultiplier(BASE_ATTACK, false));
+
+    // off hand
+    stmt.addFloat(GetFloatValue(UNIT_FIELD_MINOFFHANDDAMAGE));
+    stmt.addFloat(GetFloatValue(UNIT_FIELD_MAXOFFHANDDAMAGE));
+    stmt.addFloat(GetAPMultiplier(OFF_ATTACK, false));
+
+    // ranged
+    stmt.addFloat(GetFloatValue(UNIT_FIELD_MINRANGEDDAMAGE));
+    stmt.addFloat(GetFloatValue(UNIT_FIELD_MAXRANGEDDAMAGE));
+    stmt.addFloat(GetAPMultiplier(OFF_ATTACK, false));
+
+    // mana regen
+    stmt.addFloat(0);
+    stmt.addFloat(0);
+
+    // pvp rank
+    stmt.addInt32(GetHighestPvPRankIndex());
 
     stmt.Execute();
 }
