@@ -5330,7 +5330,10 @@ uint32 Player::DurabilityRepair(uint16 pos, bool cost, float discountMod, bool g
                 return TotalCost;
             }
             else
+            {
                 ModifyMoney(-int32(costs));
+                TotalCost += costs;
+            }
         }
     }
 
