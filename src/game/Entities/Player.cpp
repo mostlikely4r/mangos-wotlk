@@ -1715,18 +1715,21 @@ void Player::Update(const uint32 diff)
     else if (m_playerbotMgr)
         m_playerbotMgr->UpdateAI(diff);
 #endif
+}
 
 #ifdef ENABLE_PLAYERBOTS
+void Player::UpdateAI(const uint32 diff, bool minimal)
+{
     if (m_playerbotAI)
     {
-        m_playerbotAI->UpdateAI(diff);
+        m_playerbotAI->UpdateAI(diff, minimal);
     }
     if (m_playerbotMgr)
     {
         m_playerbotMgr->UpdateAI(diff);
     }
-#endif
 }
+#endif
 
 void Player::SetDeathState(DeathState s)
 {
