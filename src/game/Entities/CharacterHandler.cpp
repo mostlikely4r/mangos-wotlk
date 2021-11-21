@@ -244,9 +244,9 @@ class CharacterHandler
             {
                 player->SetPlayerbotMgr(new PlayerbotMgr(player));
                 player->GetPlayerbotMgr()->OnPlayerLogin(player);
-                //sRandomPlayerbotMgr.OnPlayerLogin(player);
+                sRandomPlayerbotMgr.OnPlayerLogin(player);
             }
-            sRandomPlayerbotMgr.OnPlayerLogin(player);
+            //sRandomPlayerbotMgr.OnPlayerLogin(player);
 #endif
         }
 #ifdef BUILD_PLAYERBOT
