@@ -632,6 +632,16 @@ LogColors = ""
 #        Default: 0 (false)
 #                 1 (true)
 #
+#    InstantFlightPaths
+#        Flight paths will take players to their destination instantly, instead of making them wait to fly there.
+#        Default: 0 (false)
+#                 1 (true)
+#
+#    TaxiFlightFarVisibility
+#        Visibility of taxi flying characters is increased up to 400y, making them visible from afar.
+#        Default: 0 (false)
+#                 1 (true)
+#
 #    AlwaysMaxSkillForLevel
 #        Players will automatically gain max level dependent (weapon/defense) skill when logging in, leveling up etc.
 #        Default: 0 (false)
@@ -880,6 +890,8 @@ DisableWaterBreath = 4
 TaxiFlightChatFix = 0
 LongFlightPathsPersistence = 0
 AllFlightPaths = 0
+InstantFlightPaths = 0
+TaxiFlightFarVisibility = 0
 AlwaysMaxSkillForLevel = 0
 ActivateWeather = 1
 CastUnstuck = 1
