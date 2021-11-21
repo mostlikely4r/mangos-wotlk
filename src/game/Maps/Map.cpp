@@ -428,16 +428,8 @@ bool Map::Add(Player* player)
     SendZoneDynamicInfo(player);
 
     NGridType* grid = getNGrid(cell.GridX(), cell.GridY());
-#ifdef ENABLE_PLAYERBOTS
-    if (!player->HaveDebugFlag(CMDEBUGFLAG_DEV_USE1))
-    {
-        player->GetViewPoint().Event_AddedToWorld(&(*grid)(cell.CellX(), cell.CellY()));
-        UpdateObjectVisibility(player, cell, p);
-    }
-#else
     player->GetViewPoint().Event_AddedToWorld(&(*grid)(cell.CellX(), cell.CellY()));
     UpdateObjectVisibility(player, cell, p);
-#endif
 
     if (IsRaid())
         player->RemoveAllGroupBuffsFromCaster(ObjectGuid());
