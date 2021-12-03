@@ -4210,7 +4210,7 @@ void Spell::SendCastResult(Player const* caster, SpellEntry const* spellInfo, ui
 
 void Spell::SendSpellStart() const
 {
-    if (!IsNeedSendToClient())
+    if (!IsNeedSendToClient(false))
         return;
 
     DEBUG_FILTER_LOG(LOG_FILTER_SPELL_CAST, "Sending SMSG_SPELL_START id=%u", m_spellInfo->Id);
@@ -4232,6 +4232,11 @@ void Spell::SendSpellStart() const
 
     if (IsSpellRequiringAmmo())
         castFlags |= CAST_FLAG_AMMO;
+
+    if ((m_caster->GetTypeId() == TYPEID_PLAYER ||
+        (m_caster->GetTypeId() == TYPEID_UNIT && m_caster->GetObjectGuid().GetHigh() == HIGHGUID_PET))
+        && m_spellInfo->powerType != POWER_HEALTH)
+        castFlags |= CAST_FLAG_PREDICTED_POWER;
 
     if (HasPersistentAuraEffect(m_spellInfo))
         castFlags |= CAST_FLAG_PERSISTENT_AA;
@@ -4260,6 +4265,9 @@ void Spell::SendSpellStart() const
 
     data << m_targets;
 
+    if (castFlags & CAST_FLAG_PREDICTED_POWER)
+        data << uint32(m_caster->GetPower((Powers)m_spellInfo->powerType));
+
     if (castFlags & CAST_FLAG_AMMO)                         // projectile info
         WriteAmmoToPacket(data);
 
@@ -4275,7 +4283,7 @@ void Spell::SendSpellStart() const
 void Spell::SendSpellGo()
 {
     // not send invisible spell casting
-    if (!IsNeedSendToClient())
+    if (!IsNeedSendToClient(true))
         return;
 
     DEBUG_FILTER_LOG(LOG_FILTER_SPELL_CAST, "Sending SMSG_SPELL_GO id=%u", m_spellInfo->Id);
@@ -4305,7 +4313,7 @@ void Spell::SendSpellGo()
     if (!m_spellInfo->StartRecoveryTime)
         castFlags |= CAST_FLAG_NO_GCD;
 
-    WorldPacket data(SMSG_SPELL_GO, 50);                    // guess size
+    WorldPacket data(SMSG_SPELL_GO, 150);                    // guess size
 
     if (m_CastItem)
         data << m_CastItem->GetPackGUID();
@@ -7855,10 +7863,10 @@ bool Spell::CheckTarget(Unit* target, SpellEffectIndex eff, bool targetB, CheckE
     return OnCheckTarget(target, eff);
 }
 
-bool Spell::IsNeedSendToClient() const
+bool Spell::IsNeedSendToClient(bool go) const
 {
     return m_spellInfo->SpellVisual[0] || m_spellInfo->SpellVisual[1] || IsChanneledSpell(m_spellInfo) ||
-           m_spellInfo->speed > 0.0f || (!m_triggeredByAuraSpell && !m_IsTriggeredSpell);
+           m_spellInfo->speed > 0.0f || (!m_triggeredByAuraSpell && !m_IsTriggeredSpell) || (go && m_triggeredByAuraSpell && IsChanneledSpell(m_triggeredByAuraSpell));
 }
 
 bool Spell::IsTriggeredSpellWithRedundantCastTime() const
