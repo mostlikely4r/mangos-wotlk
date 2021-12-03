@@ -6907,11 +6907,8 @@ void Unit::SendAttackStateUpdate(CalcDamageInfo* calcDamageInfo) const
         data << float(0);
         data << float(0);
         data << float(0);
-        for (uint8 i = 0; i < 5; ++i)
-        {
-            data << float(0);
-            data << float(0);
-        }
+        data << float(0);
+        data << float(0);
         data << uint32(0);
     }
 
