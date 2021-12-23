@@ -1110,6 +1110,8 @@ void Unit::Kill(Unit* killer, Unit* victim, DamageEffectType damagetype, SpellEn
     // stop combat
     DEBUG_FILTER_LOG(LOG_FILTER_DAMAGE, "DealDamageAttackStop");
     victim->CombatStop();
+
+    victim->InterruptSpellsCastedOnMe(false, true);
 }
 
 void Unit::HandleDamageDealt(Unit* dealer, Unit* victim, uint32& damage, CleanDamage const* cleanDamage, DamageEffectType damagetype, SpellSchoolMask damageSchoolMask, SpellEntry const* spellProto, bool duel_hasEnded)
@@ -11654,6 +11656,8 @@ void Unit::SetFeignDeath(bool apply, ObjectGuid casterGuid /*= ObjectGuid()*/, u
         {
             if (success)
             {
+                InterruptSpellsCastedOnMe();
+
                 // Successful FD: set state, stop attack (+clear target for player-controlled npcs) and clear combat if applicable
                 addUnitState(UNIT_STAT_FEIGN_DEATH);
 
@@ -13505,17 +13509,21 @@ float Unit::GetAttackDistance(Unit const* pl) const
     return (RetDistance * aggroRate);
 }
 
-void Unit::InterruptSpellsCastedOnMe(bool killDelayed)
+void Unit::InterruptSpellsCastedOnMe(bool killDelayed, bool interruptPositiveSpells, bool onlyIfNotStalked)
 {
     UnitList targets;
     // Maximum spell range=100m ?
-    MaNGOS::AnyUnitInObjectRangeCheck u_check(this, 100.0f);
+    MaNGOS::AnyUnitInObjectRangeCheck u_check(this, this->GetVisibilityData().GetVisibilityDistance());
     MaNGOS::UnitListSearcher<MaNGOS::AnyUnitInObjectRangeCheck> searcher(targets, u_check);
     Cell::VisitAllObjects(this, searcher, GetMap()->GetVisibilityDistance());
     for (auto& target : targets)
     {
-        if (!CanAttack(target))
+        if (!interruptPositiveSpells && !CanAttack(target))
             continue;
+
+        if (onlyIfNotStalked && HasAuraTypeWithCaster(SPELL_AURA_MOD_STALKED, target->GetObjectGuid()))
+            continue;
+
         for (uint32 i = CURRENT_FIRST_NON_MELEE_SPELL; i < CURRENT_MAX_SPELL; i++)
             if (Spell *spell = target->GetCurrentSpell(CurrentSpellTypes(i)))
                 if (spell->m_targets.getUnitTargetGuid() == GetObjectGuid())

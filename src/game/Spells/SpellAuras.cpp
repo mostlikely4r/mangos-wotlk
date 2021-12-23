@@ -5370,6 +5370,7 @@ void Aura::HandleModStealth(bool apply, bool Real)
                     }
                 }
             }
+            target->InterruptSpellsCastedOnMe(false, false, true);
         }
     }
     else

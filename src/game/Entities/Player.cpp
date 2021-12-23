@@ -4919,10 +4919,16 @@ void Player::BuildPlayerRepop()
 
     // set and clear other
     SetByteValue(UNIT_FIELD_BYTES_1, 3, UNIT_BYTE1_FLAG_ALWAYS_STAND);
+
+    // interrupt resurrect spells
+    InterruptSpellsCastedOnMe(false, true);
 }
 
 void Player::ResurrectPlayer(float restore_percent, bool applySickness)
 {
+    // Interrupt resurrect spells
+    InterruptSpellsCastedOnMe(false, true);
+
     // case when player is ghouled (raise ally)
     if (IsGhouled())
         BreakCharmOutgoing();
