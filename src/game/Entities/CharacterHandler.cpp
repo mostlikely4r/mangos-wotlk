@@ -78,23 +78,24 @@ private:
     PlayerbotHolder* playerbotHolder;
 
 public:
-    PlayerbotLoginQueryHolder(PlayerbotHolder* playerbotHolder, uint32 masterAccount, uint32 accountId, uint64 guid)
-        : LoginQueryHolder(accountId, ObjectGuid(guid)), masterAccountId(masterAccount), playerbotHolder(playerbotHolder) { }
+    PlayerbotLoginQueryHolder(PlayerbotHolder* playerbotHolder, uint32 masterAccount, uint32 accountId, uint32 guid)
+        : LoginQueryHolder(accountId, ObjectGuid(HIGHGUID_PLAYER, guid)), masterAccountId(masterAccount), playerbotHolder(playerbotHolder) { }
 
 public:
     uint32 GetMasterAccountId() const { return masterAccountId; }
     PlayerbotHolder* GetPlayerbotHolder() { return playerbotHolder; }
 };
 
-void PlayerbotHolder::AddPlayerBot(uint64 playerGuid, uint32 masterAccount)
+void PlayerbotHolder::AddPlayerBot(uint32 playerGuid, uint32 masterAccount)
 {
     // has bot already been added?
-    Player* bot = sObjectMgr.GetPlayer(ObjectGuid(playerGuid));
+    ObjectGuid guid = ObjectGuid(HIGHGUID_PLAYER, playerGuid);
+    Player* bot = sObjectMgr.GetPlayer(guid);
 
     if (bot && bot->IsInWorld())
         return;
 
-    uint32 accountId = sObjectMgr.GetPlayerAccountIdByGUID(ObjectGuid(playerGuid));
+    uint32 accountId = sObjectMgr.GetPlayerAccountIdByGUID(guid);
     if (accountId == 0)
         return;
 
