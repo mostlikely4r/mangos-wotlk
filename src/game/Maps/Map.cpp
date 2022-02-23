@@ -1442,11 +1442,7 @@ void Map::RemoveAllObjectsInRemoveList()
     while (!i_objectsToRemove.empty())
     {
         WorldObject* obj = *i_objectsToRemove.begin();
-
         i_objectsToRemove.erase(i_objectsToRemove.begin());
-
-        if (!obj)
-            continue;
 
         switch (obj->GetTypeId())
         {
@@ -2341,11 +2337,10 @@ void Map::SendObjectUpdates()
     while (!i_objectsToClientUpdate.empty())
     {
         Object* obj = *i_objectsToClientUpdate.begin();
-
-        i_objectsToClientUpdate.erase(i_objectsToClientUpdate.begin());
-
         if (!obj)
             continue;
+
+        i_objectsToClientUpdate.erase(i_objectsToClientUpdate.begin());
 
         obj->BuildUpdateData(update_players);
     }
