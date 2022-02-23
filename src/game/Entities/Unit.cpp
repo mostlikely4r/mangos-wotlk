@@ -13343,7 +13343,9 @@ void Unit::Uncharm(Unit* charmed, uint32 spellId)
             charmed->InterruptSpell(CURRENT_AUTOREPEAT_SPELL);
             charmed->InterruptSpell(CURRENT_MELEE_SPELL);
 
-            charmInfo->ResetCharmState();
+            if (charmInfo)
+                charmInfo->ResetCharmState();
+
             charmed->DeleteCharmInfo();
 
             // first find friendly target (stopping combat here is not recommended because m_attackers will be modified)
@@ -13385,7 +13387,8 @@ void Unit::Uncharm(Unit* charmed, uint32 spellId)
             if (Unit* owner = charmedCreature->GetOwner())
                 charmed->setFaction(owner->getFaction());
 
-            charmInfo->ResetCharmState();
+            if (charmInfo)
+                charmInfo->ResetCharmState();
 
             // as possessed is a pet we have to restore original charminfo so Pet::DeleteCharmInfo will take care of that
             charmed->DeleteCharmInfo();
@@ -13404,7 +13407,9 @@ void Unit::Uncharm(Unit* charmed, uint32 spellId)
         else
             charmedPlayer->setFactionForRace(charmedPlayer->getRace());
 
-        charmInfo->ResetCharmState();
+        if (charmInfo)
+            charmInfo->ResetCharmState();
+
         charmedPlayer->DeleteCharmInfo();
 
         charmed->GetMotionMaster()->Clear(false, true);
