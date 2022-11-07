@@ -277,7 +277,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
 #ifdef ENABLE_PLAYERBOTS
             if (player->GetPlayerbotAI() && lang != LANG_ADDON)
             {
-                player->GetPlayerbotAI()->HandleCommand(type, msg, *GetPlayer());
+                player->GetPlayerbotAI()->HandleCommand(type, msg, *GetPlayer(), lang);
                 GetPlayer()->m_speakTime = 0;
                 GetPlayer()->m_speakCount = 0;
             }
@@ -327,7 +327,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
                 Player* player = itr->getSource();
                 if (player && player->GetPlayerbotAI() && lang != LANG_ADDON)
                 {
-                    player->GetPlayerbotAI()->HandleCommand(type, msg, *GetPlayer());
+                    player->GetPlayerbotAI()->HandleCommand(type, msg, *GetPlayer(), lang);
                     GetPlayer()->m_speakTime = 0;
                     GetPlayer()->m_speakCount = 0;
                 }
@@ -370,7 +370,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
                 {
                     Player* const bot = it->second;
                     if (bot->GetGuildId() == GetPlayer()->GetGuildId() && lang != LANG_ADDON)
-                        bot->GetPlayerbotAI()->HandleCommand(type, msg, *GetPlayer());
+                        bot->GetPlayerbotAI()->HandleCommand(type, msg, *GetPlayer(), lang);
                 }
             }
 #endif
@@ -438,7 +438,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
                 Player* player = itr->getSource();
                 if (player && player->GetPlayerbotAI())
                 {
-                    player->GetPlayerbotAI()->HandleCommand(type, msg, *GetPlayer());
+                    player->GetPlayerbotAI()->HandleCommand(type, msg, *GetPlayer(), lang);
                     GetPlayer()->m_speakTime = 0;
                     GetPlayer()->m_speakCount = 0;
                 }
@@ -482,7 +482,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
                 Player* player = itr->getSource();
                 if (player && player->GetPlayerbotAI())
                 {
-                    player->GetPlayerbotAI()->HandleCommand(type, msg, *GetPlayer());
+                    player->GetPlayerbotAI()->HandleCommand(type, msg, *GetPlayer(), lang);
                     GetPlayer()->m_speakTime = 0;
                     GetPlayer()->m_speakCount = 0;
                 }
@@ -525,7 +525,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
                 Player* player = itr->getSource();
                 if (player && player->GetPlayerbotAI())
                 {
-                    player->GetPlayerbotAI()->HandleCommand(type, msg, *GetPlayer());
+                    player->GetPlayerbotAI()->HandleCommand(type, msg, *GetPlayer(), lang);
                     GetPlayer()->m_speakTime = 0;
                     GetPlayer()->m_speakCount = 0;
                 }
@@ -611,14 +611,14 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
 #ifdef ENABLE_PLAYERBOTS
                     // if GM apply to all random bots
                     if (GetSecurity() > SEC_PLAYER && GetPlayer()->IsGameMaster())
-                        sRandomPlayerbotMgr.HandleCommand(type, msg, *_player);
+                        sRandomPlayerbotMgr.HandleCommand(type, msg, *_player, "", TEAM_BOTH_ALLOWED, lang);
                     else
-                        sRandomPlayerbotMgr.HandleCommand(type, msg, *_player, "", GetPlayer()->GetTeam());
+                        sRandomPlayerbotMgr.HandleCommand(type, msg, *_player, "", GetPlayer()->GetTeam(), lang);
 
                     // apply to own bots
                     if (_player->GetPlayerbotMgr() && chn->GetFlags() & 0x18)
                     {
-                        _player->GetPlayerbotMgr()->HandleCommand(type, msg);
+                        _player->GetPlayerbotMgr()->HandleCommand(type, msg, lang);
                     }
 #endif
                 }
