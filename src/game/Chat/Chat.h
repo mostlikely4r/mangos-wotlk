@@ -719,6 +719,7 @@ class ChatHandler
         bool HandleGPSCommand(char* args);
         bool HandleTaxiCheatCommand(char* args);
         bool HandleWhispersCommand(char* args);
+        bool HandleWhisperRestrictionCommand(char* args);
         bool HandleModifyDrunkCommand(char* args);
         bool HandleSetViewCommand(char* args);
 

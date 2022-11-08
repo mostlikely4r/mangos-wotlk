@@ -1131,7 +1131,8 @@ std::shared_ptr<CreatureSpellListContainer> ObjectMgr::LoadCreatureSpellLists()
             spell.SpellId = fields[2].GetUInt32();
             spell.Flags = fields[3].GetUInt32();
 
-            if (!sSpellTemplate.LookupEntry<SpellEntry>(spell.SpellId))
+            SpellEntry const* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(spell.SpellId);
+            if (!spellInfo && spell.SpellId != 2) // 2 is attack which is hardcoded in client
             {
                 sLog.outErrorDb("LoadCreatureSpellLists: Invalid creature_spell_list %u spell %u does not exist. Skipping.", spell.Id, spell.SpellId);
                 continue;
@@ -1159,6 +1160,7 @@ std::shared_ptr<CreatureSpellListContainer> ObjectMgr::LoadCreatureSpellLists()
             spell.InitialMax = fields[9].GetUInt32();
             spell.RepeatMin = fields[10].GetUInt32();
             spell.RepeatMax = fields[11].GetUInt32();
+            spell.DisabledForAI = !spellInfo || spellInfo->HasAttribute(SPELL_ATTR_EX_NO_AUTOCAST_AI);
             newContainer->spellLists[spell.Id].Spells.emplace(spell.Position, spell);
         } while (result->NextRow());
     }
@@ -1303,17 +1305,29 @@ void ObjectMgr::LoadSpawnGroups()
 
             if (group.Type == SPAWN_GROUP_CREATURE)
             {
-                if (!GetCreatureData(guid.DbGuid))
+                CreatureData const* data = GetCreatureData(guid.DbGuid);
+                if (!data)
                 {
                     sLog.outErrorDb("LoadSpawnGroups: Invalid spawn_group_spawn guid %u. Skipping.", guid.DbGuid);
+                    continue;
+                }
+                if (!data->IsNotPartOfPoolOrEvent())
+                {
+                    sLog.outErrorDb("LoadSpawnGroups: spawn_group_spawn guid %u is part of pool or game event (incompatible). Skipping.", guid.DbGuid);
                     continue;
                 }
             }
             else
             {
-                if (!GetGOData(guid.DbGuid))
+                GameObjectData const* data = GetGOData(guid.DbGuid);
+                if (!data)
                 {
                     sLog.outErrorDb("LoadSpawnGroups: Invalid spawn_group_spawn guid %u. Skipping.", guid.DbGuid);
+                    continue;
+                }
+                if (!data->IsNotPartOfPoolOrEvent())
+                {
+                    sLog.outErrorDb("LoadSpawnGroups: spawn_group_spawn guid %u is part of pool or game event (incompatible). Skipping.", guid.DbGuid);
                     continue;
                 }
             }
@@ -2129,23 +2143,6 @@ void ObjectMgr::LoadCreatures()
             {
                 sLog.outErrorDb("Table `creature` has creature (GUID: %u, Entry: %u) with equipment_id %u already defined in creature_template table", guid, data.id, data.equipmentId); 
                 data.equipmentId = 0;
-            }
-        }
-
-        if (cInfo)
-        {
-            if (cInfo->ExtraFlags & CREATURE_EXTRA_FLAG_INSTANCE_BIND)
-            {
-                if (!mapEntry || !mapEntry->IsDungeon())
-                    sLog.outErrorDb("Table `creature` have creature (GUID: %u Entry: %u) with `creature_template`.`ExtraFlags` including CREATURE_FLAG_EXTRA_INSTANCE_BIND (%u) but creature are not in instance.",
-                        guid, data.id, CREATURE_EXTRA_FLAG_INSTANCE_BIND);
-            }
-
-            if (cInfo->ExtraFlags & CREATURE_EXTRA_FLAG_AGGRO_ZONE)
-            {
-                if (!mapEntry || !mapEntry->IsDungeon())
-                    sLog.outErrorDb("Table `creature` have creature (GUID: %u Entry: %u) with `creature_template`.`ExtraFlags` including CREATURE_FLAG_EXTRA_AGGRO_ZONE (%u) but creature are not in instance.",
-                        guid, data.id, CREATURE_EXTRA_FLAG_AGGRO_ZONE);
             }
         }
 
@@ -5396,8 +5393,6 @@ void ObjectMgr::LoadQuests()
             {
                 if (qinfo->NextQuestId)
                     sLog.outErrorDb("Quest %u is a breadcrumb, it should not unlock quest %d", qinfo->GetQuestId(), qinfo->NextQuestId);
-                if (qinfo->ExclusiveGroup)
-                    sLog.outErrorDb("Quest %u is a breadcrumb, it should not be in exclusive group %d", qinfo->GetQuestId(), qinfo->ExclusiveGroup);
             }
         }
     }
@@ -9272,7 +9267,7 @@ SkillRangeType GetSkillRangeType(SkillLineEntry const* pSkill, bool racial)
             // not set skills for professions and racial abilities
         {
             // not set skills for professions and racial abilities
-            if (IsProfessionSkill(pSkill->id))
+            if (IsProfessionOrRidingSkill(pSkill->id))
                 return SKILL_RANGE_RANK;
             if (racial)
                 return SKILL_RANGE_NONE;

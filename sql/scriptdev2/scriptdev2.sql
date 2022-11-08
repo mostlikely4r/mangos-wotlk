@@ -85,7 +85,10 @@ INSERT INTO scripted_areatrigger VALUES
 (5712,'at_hot_on_the_trail'),
 (5714,'at_hot_on_the_trail'),
 (5715,'at_hot_on_the_trail'),
-(5716,'at_hot_on_the_trail');
+(5716,'at_hot_on_the_trail'),
+-- DALARAN
+(5691,'at_underbelly_h'),
+(5693,'at_underbelly_a');
 
 /* BATTLEGROUNDS */
 UPDATE creature_template SET ScriptName='npc_spirit_guide' WHERE entry IN (13116, 13117);
@@ -113,7 +116,6 @@ UPDATE gameobject_template SET ScriptName='go_tele_to_dalaran_crystal' WHERE ent
 UPDATE gameobject_template SET ScriptName='go_tele_to_violet_stand' WHERE entry=191229;
 UPDATE gameobject_template SET ScriptName='go_andorhal_tower' WHERE entry IN (176094,176095,176096,176097);
 UPDATE gameobject_template SET ScriptName='go_scourge_enclosure' WHERE entry=191548;
-UPDATE gameobject_template SET ScriptName='go_lab_work_reagents' WHERE entry IN (190462, 190473, 190478, 190459);
 UPDATE gameobject_template SET ScriptName='go_bells' WHERE entry IN(182064,175885,176573);
 UPDATE gameobject_template SET ScriptName='go_darkmoon_faire_music' WHERE entry=180335;
 UPDATE gameobject_template SET ScriptName='go_pirate_day_music' WHERE entry=190363;
@@ -173,7 +175,6 @@ UPDATE creature_template SET ScriptName='npc_garments_of_quests' WHERE entry IN 
 UPDATE creature_template SET ScriptName='npc_guardian' WHERE entry=5764;
 UPDATE creature_template SET ScriptName='npc_doctor' WHERE entry IN (12939,12920);
 UPDATE creature_template SET ScriptName='npc_injured_patient' WHERE entry IN (12936,12937,12938,12923,12924,12925);
-UPDATE creature_template SET ScriptName='npc_prof_blacksmith' WHERE entry IN (5164,11145,11146,11176,11177,11178,11191,11192,11193);
 UPDATE creature_template SET ScriptName='npc_prof_leather' WHERE entry IN (7866,7867,7868,7869,7870,7871);
 -- disabled, but can be used for custom
 -- UPDATE creature_template SET ScriptName='' WHERE npcflag!=npcflag|65536 AND ScriptName='npc_innkeeper';
@@ -265,6 +266,7 @@ INSERT INTO scripted_event_id VALUES
 UPDATE creature_template SET ScriptName='npc_war_effort' WHERE
 entry IN(15383,15431,15432,15434,15437,15445,15446,15448,15450,15451,15452,15453,15455,15456,15457,15459,15460,15469,15477,15508,15512,15515,15522,15525,15528,15529,15532,15533,15534,15535);
 UPDATE gameobject_template SET ScriptName='go_scarab_gong' WHERE entry=180717; -- The Scarab Gong
+UPDATE creature_template SET ScriptName='npc_silithus_boss' WHERE entry IN(15742,15741,15740);
 
 /*Midsummer*/
 UPDATE gameobject_template SET ScriptName='go_midsummer_bonfire' WHERE entry IN(187946,187945,187944,187943,187942,187941,187940,187939,187938,187937,187936,187935,187934,187933,187932,187931,187930,187929,187928,187927,187926,187925,187924,187923,187922,187921,187920,187919,187917,187916,187914,187564,187971,187973,187952,187963,187950,187961,187959,187957,187968,187948,187953,187970,187966,187975,187969,187951,187956,187954,187947,187972,187964,187559,187965,187949,187955,187967,187958,187974,187960,187962,181332,181333,181334,181335,181336,181337,188128,188129);
@@ -624,6 +626,7 @@ UPDATE creature_template SET ScriptName='npc_mootoo_the_younger' WHERE entry=255
 UPDATE creature_template SET ScriptName='npc_storm_totem' WHERE entry=26048;
 UPDATE creature_template SET ScriptName='npc_proudhoof' WHERE entry=25335;
 UPDATE creature_template SET ScriptName='npc_orphaned_mammoth_calf' WHERE entry=25861;
+UPDATE gameobject_template SET ScriptName='go_mammoth_trap_borean' WHERE entry IN(188022,188024,188025,188026,188027,188028,188029,188030,188031,188032,188033,188034,188035,188036,188037,188038,188039,188040,188041,188042,188043,188044);
 
 /* BURNING STEPPES */
 UPDATE creature_template SET ScriptName='npc_grark_lorkrub' WHERE entry=9520;
@@ -1939,6 +1942,17 @@ UPDATE creature_template SET ScriptName='npc_eagle_trash_aggro_trigger' WHERE en
 UPDATE creature_template SET ScriptName='npc_gurgthock' WHERE entry=30007;
 UPDATE creature_template SET ScriptName='npc_ghoul_feeding_bunny' WHERE entry=28591;
 UPDATE creature_template SET ScriptName='npc_decaying_ghoul' WHERE entry=28565;
+INSERT INTO scripted_areatrigger VALUES
+(5056,'at_overlord_drakuru'),
+(5057,'at_overlord_drakuru'),
+(5058,'at_overlord_drakuru'),
+(5059,'at_overlord_drakuru'),
+(5060,'at_overlord_drakuru'),
+(5095,'at_overlord_drakuru'),
+(5096,'at_overlord_drakuru'),
+(5097,'at_overlord_drakuru'),
+(5098,'at_overlord_drakuru');
+UPDATE creature_template SET ScriptName='npc_argent_stand_unit' WHERE entry IN(28028,28029);
 
 
 /* ZUL'FARRAK */
@@ -2056,15 +2070,7 @@ INSERT INTO script_texts (entry,content_default,sound,type,language,emote,broadc
 ('-1000138','Prepare to enter oblivion, meddlers. You have unleashed a god!','0','1','0','15','18443','Salhadaar SAY'),
 ('-1000139','Avruu''s magic is broken! I''m free once again!','0','0','0','0','13447','aeranas SAY_FREE'),
 
-('-1000140','Let''s go.','0','0','1','0','15894','lilatha SAY_START'),
-('-1000141','$N, let''s use the antechamber to the right.','0','0','1','0','12187','lilatha SAY_PROGRESS1'),
-('-1000142','I can see the light at the end of the tunnel!','0','0','1','0','12188','lilatha SAY_PROGRESS2'),
-('-1000143','There''s Farstrider Enclave now, $C. Not far to go... Look out! Troll ambush!!','0','0','1','0','12189','lilatha SAY_PROGRESS3'),
-('-1000144','Thank you for saving my life and bringing me back to safety, $N','0','0','1','0','12191','lilatha SAY_END1'),
-('-1000145','Captain Helios, I''ve been rescued from the Amani Catacombs. Reporting for duty, sir!','0','0','1','0','12190','lilatha SAY_END2'),
-('-1000146','Liatha, get someone to look at those injuries. Thank you for bringing her back safely.','0','0','1','0','12193','lilatha CAPTAIN_ANSWER'),
-
-('-1000147','I remember well the sting of defeat at the conclusion of the Third War. I have waited far too long for my revenge. Now the shadow of the Legion falls over this world. It is only a matter of time until all of your failed creation... is undone.','11332','1','0','0','20076','kazzak SAY_INTRO'),
+('-1000147','I remember well the sting of defeat at the conclusion of the Third War. I have waited far too long for my revenge. Now the shadow of the Legion falls over this world. It is only a matter of time until all of your failed creation... is undone. ','11332','1','0','0','20076','kazzak SAY_INTRO'),
 ('-1000148','The Legion will conquer all!','11333','1','0','0','20077','kazzak SAY_AGGRO1'),
 ('-1000149','All mortals will perish!','11334','1','0','0','20078','kazzak SAY_AGGRO2'),
 ('-1000150','All life must be eradicated!','11335','1','0','0','20079','kazzak SAY_SURPREME1'),
@@ -3689,27 +3695,6 @@ INSERT INTO script_texts (entry,content_default,sound,type,language,emote,broadc
 ('-1036003','D''ah! Now you''re making me angry!','5779','0','0','15','1345','smite SAY_PHASE_3');
 
 -- -1 043 000 WAILING CAVERNS
-INSERT INTO script_texts (entry,content_default,sound,type,language,emote,broadcast_text_id,comment) VALUES
-('-1043000','At last! Naralex can be awakened! Come aid me, brave adventurers!','0','6','0','0','2101','Disciple of Naralex - SAY_INTRO'),
-('-1043001','I must make the necessary preparations before the awakening ritual can begin. You must protect me!','0','0','0','0','1255','SAY_PREPARE'),
-('-1043002','These caverns were once a temple of promise for regrowth in the Barrens. Now, they are the halls of nightmares.','0','0','0','0','1256','Disciple of Naralex - SAY_FIRST_CORNER'),
-('-1043003','Come. We must continue. There is much to be done before we can pull Naralex from his nightmare.','0','0','0','0','1257','Disciple of Naralex - SAY_CONTINUE'),
-('-1043004','Within this circle of fire I must cast the spell to banish the spirits of the slain Fanglords.','0','0','0','0','1258','Disciple of Naralex - SAY_CIRCLE_BANISH'),
-('-1043005','The caverns have been purified. To Naralex''s chamber we go!','0','0','0','0','1259','Disciple of Naralex - SAY_PURIFIED'),
-('-1043006','Beyond this corridor, Naralex lies in fitful sleep. Let us go awaken him before it is too late.','0','0','0','0','1263','Disciple of Naralex - SAY_NARALEX_CHAMBER'),
-('-1043007','Protect me brave souls as I delve into the Emerald Dream to rescue Naralex and put an end to this corruption!','0','1','0','0','1264','Disciple of Naralex - SAY_BEGIN_RITUAL'),
-('-1043008','%s begins to perform the awakening ritual on Naralex.','0','2','0','0','1265','Disciple of Naralex - EMOTE_RITUAL_BEGIN'),
-('-1043009','%s tosses fitfully in troubled sleep.','0','2','0','0','1268','Naralex - EMOTE_NARALEX_AWAKE'),
-('-1043010','%s writhes in agony. The Disciple seems to be breaking through.','0','2','0','0','1269','Naralex - EMOTE_BREAK_THROUGH'),
-('-1043011','%s dreams up a horrendous vision. Something stirs beneath the murky waters.','0','2','0','0','1270','Naralex - EMOTE_VISION'),
-('-1043012','This $N is a minion from Naralex''s nightmare no doubt!.','0','0','0','0','1276','Disciple of Naralex - SAY_MUTANUS'),
-('-1043013','I AM AWAKE, AT LAST!','5789','1','0','0','1271','Naralex - SAY_NARALEX_AWAKE'),
-('-1043014','At last! Naralex awakes from the nightmare.','0','0','0','0','1267','Disciple of Naralex - SAY_AWAKE'),
-('-1043015','Ah, to be pulled from the dreaded nightmare! I thank you, my loyal Disciple, along with your brave companions.','0','0','0','0','1272','Naralex - SAY_NARALEX_THANKYOU'),
-('-1043016','We must go and gather with the other Disciplies. There is much work to be done before I can make another attempt to restore the Barrens. Farewell, brave souls!','0','0','0','0','2103','Naralex - SAY_FAREWELL'),
-('-1043017','Attacked! Help get this $N off of me!','0','0','0','0','1273','Disciple of Naralex - SAY_AGGRO_1'),
-('-1043018','Help!','0','0','0','0','1277','Disciple of Naralex - SAY_AGGRO_2'),
-('-1043019','Deal with this $N! I need to prepare to awake Naralex!','0','0','0','0','1274','Disciple of Naralex - SAY_AGGRO_3');
 
 -- -1 047 000 RAZORFEN KRAUL
 INSERT INTO script_texts (entry,content_default,sound,type,language,emote,broadcast_text_id,comment) VALUES
@@ -8315,48 +8300,6 @@ INSERT INTO script_waypoint (Entry, PathId, Point, PositionX, PositionY, Positio
 (3584,0,19,4566.09,303.127,55.0396,0,0,0,''),
 (3584,0,20,4561.65,295.456,57.0984,0,4000,0,'SAY_THERYLUNE_FINISH'),
 (3584,0,21,4551.03,293.333,57.1534,0,2000,0,''),
-(3678,0,1,-134.925,125.468,-78.16,0,0,0,''),
-(3678,0,2,-125.684,132.937,-78.42,0,0,0,''),
-(3678,0,3,-113.812,139.295,-80.98,0,0,0,''),
-(3678,0,4,-109.854,157.538,-80.2,0,0,0,''),
-(3678,0,5,-108.64,175.207,-79.74,0,0,0,''),
-(3678,0,6,-108.668,195.457,-80.64,0,0,0,''),
-(3678,0,7,-111.007,219.007,-86.58,0,0,0,''),
-(3678,0,8,-102.408,232.821,-91.52,0,0,0,'first corner SAY_FIRST_CORNER'),
-(3678,0,9,-92.434,227.742,-90.75,0,0,0,''),
-(3678,0,10,-82.456,224.853,-93.57,0,0,0,''),
-(3678,0,11,-67.789,208.073,-93.34,0,0,0,''),
-(3678,0,12,-43.343,205.295,-96.37,0,0,0,''),
-(3678,0,13,-34.676,221.394,-95.82,0,0,0,''),
-(3678,0,14,-32.582,238.573,-93.51,0,0,0,''),
-(3678,0,15,-42.149,258.672,-92.88,0,0,0,''),
-(3678,0,16,-55.257,274.696,-92.83,0,0,0,'circle of flames SAY_CIRCLE_BANISH'),
-(3678,0,17,-48.604,287.584,-92.46,0,0,0,''),
-(3678,0,18,-47.236,296.093,-90.88,0,0,0,''),
-(3678,0,19,-35.618,309.067,-89.73,0,0,0,''),
-(3678,0,20,-23.573,311.376,-88.6,0,0,0,''),
-(3678,0,21,-8.692,302.389,-87.43,0,0,0,''),
-(3678,0,22,-1.237,293.268,-85.55,0,0,0,''),
-(3678,0,23,10.398,279.294,-85.86,0,0,0,''),
-(3678,0,24,23.108,264.693,-86.69,0,0,0,''),
-(3678,0,25,31.996,251.436,-87.62,0,0,0,''),
-(3678,0,26,43.374,233.073,-87.61,0,0,0,''),
-(3678,0,27,54.438,212.048,-89.5,0,3000,0,'chamber entrance SAY_NARALEX_CHAMBER'),
-(3678,0,28,78.794,208.895,-92.84,0,0,0,''),
-(3678,0,29,88.392,225.231,-94.46,0,0,0,''),
-(3678,0,30,98.758,233.938,-95.84,0,0,0,''),
-(3678,0,31,107.248,233.054,-95.98,0,0,0,''),
-(3678,0,32,112.825,233.907,-96.39,0,0,0,''),
-(3678,0,33,114.634,236.969,-96.04,0,1000,0,'naralex SAY_BEGIN_RITUAL'),
-(3678,0,34,127.385,252.279,-90.07,0,0,0,''),
-(3678,0,35,121.595,264.488,-91.55,0,0,0,''),
-(3678,0,36,115.472,264.253,-91.5,0,0,0,''),
-(3678,0,37,99.988,252.79,-91.51,0,0,0,''),
-(3678,0,38,96.347,245.038,-90.34,0,0,0,''),
-(3678,0,39,82.201,216.273,-86.1,0,0,0,''),
-(3678,0,40,75.112,206.494,-84.8,0,0,0,''),
-(3678,0,41,27.174,201.064,-72.31,0,0,0,''),
-(3678,0,42,-41.114,204.149,-78.94,0,0,0,''),
 (3692,0,1,4608.43,-6.32,69.74,0,1000,0,'stand up'),
 (3692,0,2,4608.43,-6.32,69.74,0,4000,0,'SAY_START'),
 (3692,0,3,4604.54,-5.17,69.51,0,0,0,''),
@@ -9587,41 +9530,6 @@ INSERT INTO script_waypoint (Entry, PathId, Point, PositionX, PositionY, Positio
 (15420, 0, 9, 9290.5205, -6654.362, 31.830189, 100, 0, 0, 'Prospector Anvilward'),
 (15420, 0, 10, 9289.944, -6657.774, 31.828085, 100, 0, 0, 'Prospector Anvilward'),
 (15420, 0, 11, 9290.866, -6658.0156, 31.823935, 0.104719758033752441, 60000, 0, 'Prospector Anvilward'),
-(16295,0,1,7545.07,-7359.87,162.354,0,4000,0,'SAY_START'),
-(16295,0,2,7550.05,-7362.24,162.236,0,0,0,''),
-(16295,0,3,7566.98,-7364.32,161.739,0,0,0,''),
-(16295,0,4,7578.83,-7361.68,161.739,0,0,0,''),
-(16295,0,5,7590.97,-7359.05,162.258,0,0,0,''),
-(16295,0,6,7598.35,-7362.82,162.257,0,4000,0,'SAY_PROGRESS_1'),
-(16295,0,7,7605.86,-7380.42,161.937,0,0,0,''),
-(16295,0,8,7605.3,-7387.38,157.254,0,0,0,''),
-(16295,0,9,7606.13,-7393.89,156.942,0,0,0,''),
-(16295,0,10,7615.21,-7400.19,157.143,0,0,0,''),
-(16295,0,11,7618.96,-7402.65,158.202,0,0,0,''),
-(16295,0,12,7636.85,-7401.76,162.145,0,0,0,'SAY_PROGRESS_2'),
-(16295,0,13,7637.06,-7404.94,162.207,0,4000,0,''),
-(16295,0,14,7636.91,-7412.59,162.366,0,0,0,''),
-(16295,0,15,7637.61,-7425.59,162.631,0,0,0,''),
-(16295,0,16,7637.82,-7459.06,163.303,0,0,0,''),
-(16295,0,17,7638.86,-7470.9,162.517,0,0,0,''),
-(16295,0,18,7641.4,-7488.22,157.381,0,0,0,''),
-(16295,0,19,7634.46,-7505.45,154.682,0,0,0,'SAY_PROGRESS_3'),
-(16295,0,20,7631.91,-7516.95,153.597,0,0,0,''),
-(16295,0,21,7622.23,-7537.04,151.587,0,0,0,''),
-(16295,0,22,7610.92,-7550.67,149.639,0,0,0,''),
-(16295,0,23,7598.23,-7562.55,145.954,0,0,0,''),
-(16295,0,24,7588.51,-7577.76,148.294,0,0,0,''),
-(16295,0,25,7567.34,-7608.46,146.006,0,0,0,''),
-(16295,0,26,7562.55,-7617.42,148.098,0,0,0,''),
-(16295,0,27,7561.51,-7645.06,151.245,0,0,0,''),
-(16295,0,28,7563.34,-7654.65,151.227,0,0,0,''),
-(16295,0,29,7565.53,-7658.3,151.249,0,0,0,''),
-(16295,0,31,7579.12,-7662.21,151.652,0,0,0,'quest complete'),
-(16295,0,32,7603.77,-7667,153.998,0,0,0,''),
-(16295,0,33,7603.77,-7667,153.998,0,4000,0,'SAY_END_1'),
-(16295,0,34,7603.77,-7667,153.998,0,8000,0,'SAY_END_2'),
-(16295,0,35,7603.77,-7667,153.998,0,0,0,''),
-(16295,0,40,7571.16,-7659.12,151.245,0,0,0,''),
 (16812,0,1,-10868.3,-1779.84,90.476,0,2500,0,'Open door, begin walking'),
 (16812,0,2,-10875.6,-1779.58,90.478,0,0,0,''),
 (16812,0,3,-10887.4,-1779.26,90.476,0,0,0,''),

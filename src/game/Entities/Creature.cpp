@@ -148,9 +148,9 @@ Creature::Creature(CreatureSubtype subtype) : Unit(),
     m_originalEntry(0), m_ai(nullptr),
     m_isInvisible(false), m_ignoreMMAP(false), m_forceAttackingCapability(false), m_countSpawns(false),
     m_creatureInfo(nullptr),
-    m_noXP(false), m_noLoot(false), m_noReputation(false), m_ignoringFeignDeath(false), m_noWeaponSkillGain(false),
+    m_noXP(false), m_noLoot(false), m_noReputation(false), m_noWoundedSlowdown(false), m_ignoringFeignDeath(false), m_noWeaponSkillGain(false),
     m_immunitySet(UINT32_MAX),
-    m_creatureGroup(nullptr)
+    m_creatureGroup(nullptr), m_imposedCooldown(false)
 {
     m_valuesCount = UNIT_END;
 
@@ -241,6 +241,10 @@ void Creature::RemoveFromWorld()
         if (uint32 spellId = GetCreatedBySpellId())
             if (Unit* spawner = GetSpawner())
                 spawner->RemoveCreature(spellId, false);
+
+        if (GetUInt32Value(UNIT_CREATED_BY_SPELL)) // optimization
+            if (Unit* owner = GetOwner())
+                StartCooldown(owner);
 
         ClearCreatureGroup();
     }
@@ -460,6 +464,7 @@ bool Creature::InitEntry(uint32 Entry, CreatureData const* data /*=nullptr*/, Ga
     SetCanCallForAssistance((cinfo->ExtraFlags & CREATURE_EXTRA_FLAG_NO_CALL_ASSIST) == 0);
     SetNoLoot(false);
     SetNoReputation(false);
+    SetNoWoundedSlowdown((cinfo->ExtraFlags & CREATURE_EXTRA_FLAG_NO_WOUNDED_SLOWDOWN) != 0);
     SetIgnoreFeignDeath((cinfo->ExtraFlags & CREATURE_EXTRA_FLAG_IGNORE_FEIGN_DEATH) != 0);
     SetNoWeaponSkillGain((cinfo->ExtraFlags & CREATURE_EXTRA_FLAG_NO_SKILL_GAINS) != 0);
 
@@ -502,7 +507,7 @@ bool Creature::InitEntry(uint32 Entry, CreatureData const* data /*=nullptr*/, Ga
     return true;
 }
 
-bool Creature::UpdateEntry(uint32 Entry, const CreatureData* data /*=nullptr*/, GameEventCreatureData const* eventData /*=nullptr*/, bool preserveHPAndPower /*=true*/)
+bool Creature::UpdateEntry(uint32 Entry, const CreatureData* data /*=nullptr*/, GameEventCreatureData const* eventData /*=nullptr*/, bool preserveHPAndPower /*=true*/, bool randomizeLevels/*= true*/)
 {
     if (!InitEntry(Entry, data, eventData))
         return false;
@@ -513,12 +518,12 @@ bool Creature::UpdateEntry(uint32 Entry, const CreatureData* data /*=nullptr*/, 
     if (preserveHPAndPower)
     {
         uint32 healthPercent = GetHealthPercent();
-        SelectLevel();
+        SelectLevel(randomizeLevels ? USE_DEFAULT_DATABASE_LEVEL : GetLevel());
         SetHealthPercent(healthPercent);
     }
     else
     {
-        SelectLevel();
+        SelectLevel(randomizeLevels ? USE_DEFAULT_DATABASE_LEVEL : GetLevel());
         if (data)
         {
             uint32 curhealth = data->curhealth > 1 ? data->curhealth : GetMaxHealth();
@@ -640,6 +645,9 @@ void Creature::ResetEntry(bool respawn)
         }
         else
             UpdateEntry(m_originalEntry, data, eventData, false);
+
+        if (data && data->spawnTemplate->relayId)
+            GetMap()->ScriptsStart(sRelayScripts, data->spawnTemplate->relayId, this, nullptr);
     }
     else
         UpdateEntry(m_originalEntry, data, eventData, false);
@@ -1625,6 +1633,15 @@ bool Creature::LoadFromDB(uint32 dbGuid, Map* map, uint32 newGuid, uint32 forced
     if (entry == 0)
         entry = GetCreatureConditionalSpawnEntry(dbGuid, map);
 
+    SpawnGroupEntry* groupEntry = map->GetMapDataContainer().GetSpawnGroupByGuid(dbGuid, TYPEID_UNIT); // use dynguid by default \o/
+    CreatureGroup* group = nullptr;
+    if (groupEntry)
+    {
+        group = static_cast<CreatureGroup*>(map->GetSpawnManager().GetSpawnGroup(groupEntry->Id));
+        if (!entry)
+            entry = group->GetGuidEntry(dbGuid);
+    }
+
     if (!entry)
         return false;
 
@@ -1635,16 +1652,16 @@ bool Creature::LoadFromDB(uint32 dbGuid, Map* map, uint32 newGuid, uint32 forced
         return false;
     }
 
-    SpawnGroupEntry* groupEntry = map->GetMapDataContainer().GetSpawnGroupByGuid(dbGuid, TYPEID_UNIT); // use dynguid by default \o/
-    CreatureGroup* group = nullptr;
-    if (groupEntry)
+    bool dynguid = false;
+    if (map->IsDynguidForced())
+        dynguid = true;
+    if (!dynguid)
     {
-        group = static_cast<CreatureGroup*>(map->GetSpawnManager().GetSpawnGroup(groupEntry->Id));
-        if (!entry)
-            entry = group->GetGuidEntry(dbGuid);
+        if (((cinfo->ExtraFlags & CREATURE_EXTRA_FLAG_DYNGUID) != 0 || groupEntry) && dbGuid == newGuid)
+            dynguid = true;
     }
 
-    if (((cinfo->ExtraFlags & CREATURE_EXTRA_FLAG_DYNGUID) != 0 || groupEntry) && dbGuid == newGuid)
+    if (dynguid)
         newGuid = map->GenerateLocalLowGuid(cinfo->GetHighGuid());
 
     GameEventCreatureData const* eventData = sGameEventMgr.GetCreatureUpdateDataForActiveEvent(dbGuid);
@@ -1879,6 +1896,10 @@ void Creature::SetDeathState(DeathState s)
         Unmount();
         ClearCreatureGroup();
 
+        if (GetUInt32Value(UNIT_CREATED_BY_SPELL)) // optimization
+            if (Unit* owner = GetOwner())
+                StartCooldown(owner);
+
         Unit::SetDeathState(CORPSE);
     }
 
@@ -1950,7 +1971,7 @@ void Creature::ForcedDespawn(uint32 timeMSToDespawn, bool onlyAlive)
     SetHealth(0);                                           // just for nice GM-mode view
 }
 
-bool Creature::IsImmuneToSpell(SpellEntry const* spellInfo, bool castOnSelf, uint8 effectMask)
+bool Creature::IsImmuneToSpell(SpellEntry const* spellInfo, bool castOnSelf, uint8 effectMask, WorldObject const* caster)
 {
     if (!spellInfo)
         return false;
@@ -1964,7 +1985,7 @@ bool Creature::IsImmuneToSpell(SpellEntry const* spellInfo, bool castOnSelf, uin
             return true;
     }
 
-    return Unit::IsImmuneToSpell(spellInfo, castOnSelf, effectMask);
+    return Unit::IsImmuneToSpell(spellInfo, castOnSelf, effectMask, caster);
 }
 
 bool Creature::IsImmuneToDamage(SpellSchoolMask meleeSchoolMask)
@@ -2684,7 +2705,7 @@ void Creature::FillGuidsListFromThreatList(GuidVector& guids, uint32 maxamount /
 
 struct AddCreatureToRemoveListInMapsWorker
 {
-    AddCreatureToRemoveListInMapsWorker(ObjectGuid guid) : i_guid(guid) {}
+    AddCreatureToRemoveListInMapsWorker(uint32 dbGuid) : i_guid(dbGuid) {}
 
     void operator()(Map* map)
     {
@@ -2692,12 +2713,12 @@ struct AddCreatureToRemoveListInMapsWorker
             pCreature->AddObjectToRemoveList();
     }
 
-    ObjectGuid i_guid;
+    uint32 i_guid;
 };
 
 void Creature::AddToRemoveListInMaps(uint32 db_guid, CreatureData const* data)
 {
-    AddCreatureToRemoveListInMapsWorker worker(data->GetObjectGuid(db_guid));
+    AddCreatureToRemoveListInMapsWorker worker(db_guid);
     sMapMgr.DoForAllMapsWithMapId(data->mapid, worker);
 }
 
@@ -2965,6 +2986,11 @@ void Creature::ResetSpellHitCounter()
     m_hitBySpells.clear();
 }
 
+bool Creature::IsSlowedInCombat() const
+{
+    return !IsNoWoundedSlowdown() && HasAuraState(AURA_STATE_HEALTHLESS_20_PERCENT);
+}
+
 void Creature::AddCooldown(SpellEntry const& spellEntry, ItemPrototype const* /*itemProto*/, bool permanent, uint32 forcedDuration)
 {
     uint32 recTime = forcedDuration ? forcedDuration : spellEntry.RecoveryTime;
@@ -2974,7 +3000,7 @@ void Creature::AddCooldown(SpellEntry const& spellEntry, ItemPrototype const* /*
         bool success = GetSpellCooldown(spellEntry.Id, cooldown);
         if (!success)
             success = sObjectMgr.GetCreatureCooldown(GetCreatureInfo()->Entry, spellEntry.Id, cooldown);
-        if (success)
+        if (success && cooldown) // lets see if this will one day become a problem, if it does, add -1 -1 defaults to creature spell lists
             recTime = cooldown;
     }
     uint32 categoryRecTime = spellEntry.CategoryRecoveryTime;
@@ -3012,5 +3038,17 @@ void Creature::AddCooldown(SpellEntry const& spellEntry, ItemPrototype const* /*
                 player->GetSession()->SendPacket(data);
             }
         }
+    }
+}
+
+void Creature::StartCooldown(Unit* owner)
+{
+    if (!m_imposedCooldown)
+    {
+        m_imposedCooldown = true;
+        SpellEntry const* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(GetUInt32Value(UNIT_CREATED_BY_SPELL));
+        // Remove infinity cooldown
+        if (spellInfo && spellInfo->HasAttribute(SPELL_ATTR_COOLDOWN_ON_EVENT))
+            owner->AddCooldown(*spellInfo);
     }
 }

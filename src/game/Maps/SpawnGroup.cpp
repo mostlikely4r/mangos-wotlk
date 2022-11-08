@@ -119,15 +119,21 @@ void SpawnGroup::Spawn(bool force)
     if (!m_enabled && !force)
         return;
 
+    // duplicated code for optimization - way fewer cond fails
+    if ((m_entry.Flags & SPAWN_GROUP_DESPAWN_ON_COND_FAIL) != 0) // must be before count check
+    {
+        if (!IsWorldstateConditionSatisfied())
+        {
+            Despawn();
+            return;
+        }
+    }
+
     if (m_objects.size() >= m_entry.MaxCount)
         return;
 
     if (!IsWorldstateConditionSatisfied())
-    {
-        if ((m_entry.Flags & SPAWN_GROUP_DESPAWN_ON_COND_FAIL) != 0)
-            Despawn();
         return;
-    }
 
     if (m_entry.HasChancedSpawns && m_chosenSpawns.size() >= m_entry.MaxCount)
         return;
@@ -356,7 +362,11 @@ void CreatureGroup::RemoveObject(WorldObject* wo)
     CreatureData const* data = sObjectMgr.GetCreatureData(wo->GetDbGuid());
     m_map.GetPersistentState()->RemoveCreatureFromGrid(wo->GetDbGuid(), data);
     if (m_objects.empty() && wo->GetInstanceData()) // on last being removed
+    {
         wo->GetInstanceData()->OnCreatureGroupDespawn(this, static_cast<Creature*>(wo));
+        if (GetFormationData())
+            GetFormationData()->ResetLastWP();
+    }
 }
 
 void CreatureGroup::TriggerLinkingEvent(uint32 event, Unit* target)
@@ -399,11 +409,23 @@ void CreatureGroup::TriggerLinkingEvent(uint32 event, Unit* target)
             }
             break;
         case CREATURE_GROUP_EVENT_HOME:
+            if (FormationData* formation = GetFormationData())
+                if (!IsEvading()) // on last evade complete
+                    formation->OnHome();
+
         case CREATURE_GROUP_EVENT_RESPAWN:
             if ((m_entry.Flags & CREATURE_GROUP_RESPAWN_TOGETHER) == 0)
                 return;
 
             ClearRespawnTimes();
+            break;
+        case CREATURE_GROUP_EVENT_MEMBER_DIED:
+            for (auto const& data : m_objects)
+            {
+                uint32 dbGuid = data.first;
+                if (Creature* creature = m_map.GetCreature(dbGuid))
+                    creature->AI()->CreatureGroupMemberDied(target);
+            }
             break;
     }
 }
@@ -442,11 +464,43 @@ void CreatureGroup::MoveHome()
     }
 }
 
-void CreatureGroup::Despawn()
+void CreatureGroup::Despawn(uint32 timeMSToDespawn, bool onlyAlive)
+{
+    for (SpawnGroupDbGuids const& sgEntry : m_entry.DbGuids)
+        if (Creature* creature = m_map.GetCreature(sgEntry.DbGuid))
+            creature->ForcedDespawn(timeMSToDespawn, onlyAlive);
+}
+
+bool CreatureGroup::IsOutOfCombat()
 {
     for (auto objItr : m_objects)
+    {
         if (Creature* creature = m_map.GetCreature(objItr.first))
-            creature->ForcedDespawn();
+        {
+            if (!creature->IsAlive())
+                continue;
+
+            if (creature->IsInCombat())
+                return false;
+        }
+    }
+    return true;
+}
+
+bool CreatureGroup::IsEvading()
+{
+    for (auto objItr : m_objects)
+    {
+        if (Creature* creature = m_map.GetCreature(objItr.first))
+        {
+            if (!creature->IsAlive())
+                continue;
+
+            if (creature->GetCombatManager().IsEvadingHome())
+                return true;
+        }
+    }
+    return false;
 }
 
 void CreatureGroup::ClearRespawnTimes()
@@ -467,11 +521,11 @@ void GameObjectGroup::RemoveObject(WorldObject* wo)
     m_map.GetPersistentState()->RemoveGameobjectFromGrid(wo->GetDbGuid(), data);
 }
 
-void GameObjectGroup::Despawn()
+void GameObjectGroup::Despawn(uint32 timeMSToDespawn /*= 0*/)
 {
     for (auto objItr : m_objects)
         if (GameObject* go = m_map.GetGameObject(objItr.first))
-            go->ForcedDespawn();
+            go->ForcedDespawn(timeMSToDespawn);
 }
 
 ////////////////////
@@ -479,7 +533,7 @@ void GameObjectGroup::Despawn()
 ////////////////////
 
 FormationData::FormationData(CreatureGroup* gData, FormationEntrySPtr fEntry) :
-    m_groupData(gData), m_fEntry(fEntry), m_mirrorState(false), m_lastWP(0), m_wpPathId(0), m_followerStopped(false)
+    m_groupData(gData), m_fEntry(fEntry), m_mirrorState(false), m_lastWP(0), m_wpPathId(0), m_followerStopped(false), m_masterDied(false)
 {
     for (auto const& sData : m_groupData->GetGroupEntry().DbGuids)
     {
@@ -721,6 +775,7 @@ bool FormationData::TrySetNewMaster(Unit* masterCandidat /*= nullptr*/)
 void FormationData::Reset()
 {
     m_mirrorState = false;
+    m_masterDied = false;
 
     SwitchFormation(m_fEntry->Type);
 
@@ -791,9 +846,23 @@ void FormationData::OnDeath(Creature* creature)
     creature->SetFormationSlot(nullptr);
 
     if (formationMaster)
-        TrySetNewMaster();
-    else if(HaveOption(SPAWN_GROUP_FORMATION_OPTION_KEEP_CONPACT))
+    {
+        if (!m_groupData->IsOutOfCombat()) // must be deferred to arrival home
+            m_masterDied = true;
+        else
+            TrySetNewMaster();
+    }
+    else if (HaveOption(SPAWN_GROUP_FORMATION_OPTION_KEEP_CONPACT))
         FixSlotsPositions();
+}
+
+void FormationData::OnHome()
+{
+    if (m_masterDied)
+    {
+        m_masterDied = false;
+        TrySetNewMaster();
+    }
 }
 
 void FormationData::OnDelete(Creature* creature)

@@ -242,6 +242,13 @@ bool GameObject::Create(uint32 dbGuid, uint32 guidlow, uint32 name_id, Map* map,
 
     switch (GetGoType())
     {
+        case GAMEOBJECT_TYPE_DOOR:
+        case GAMEOBJECT_TYPE_BUTTON:
+            // safe to use door cos both have startOpen on same spot
+            SetGoState(goinfo->door.startOpen ? GO_STATE_ACTIVE : GO_STATE_READY);
+            if (goinfo->door.startOpen)
+                m_lootState = GO_NOT_READY;
+            break;
         case GAMEOBJECT_TYPE_TRAP:
             // values from rogue detect traps aura
             if (goinfo->trap.stealthed)
@@ -905,8 +912,17 @@ bool GameObject::LoadFromDB(uint32 dbGuid, Map* map, uint32 newGuid, uint32 forc
             entry = group->GetGuidEntry(dbGuid);
     }
 
-    GameObjectInfo const* goinfo = ObjectMgr::GetGameObjectInfo(entry);
-    if ((goinfo && (goinfo->ExtraFlags & GAMEOBJECT_EXTRA_FLAG_DYNGUID) != 0 || groupEntry) && dbGuid == newGuid)
+    bool dynguid = false;
+    if (map->IsDynguidForced())
+        dynguid = true;
+    if (!dynguid)
+    {
+        GameObjectInfo const* goinfo = ObjectMgr::GetGameObjectInfo(entry);
+        if ((goinfo && (goinfo->ExtraFlags & GAMEOBJECT_EXTRA_FLAG_DYNGUID) != 0 || groupEntry) && dbGuid == newGuid)
+            dynguid = true;
+    }
+
+    if (dynguid)
         newGuid = map->GenerateLocalLowGuid(HIGHGUID_GAMEOBJECT);
 
     if (uint32 randomEntry = sObjectMgr.GetRandomGameObjectEntry(dbGuid))
@@ -1349,13 +1365,13 @@ bool GameObject::IsCollisionEnabled() const
     }
 }
 
-void GameObject::ResetDoorOrButton()
+void GameObject::ResetDoorOrButton(Unit* user/*= nullptr*/)
 {
     if (m_lootState == GO_READY || m_lootState == GO_JUST_DEACTIVATED)
         return;
 
     SwitchDoorOrButton(false);
-    SetLootState(GO_JUST_DEACTIVATED);
+    SetLootState(GO_JUST_DEACTIVATED, user);
     m_cooldownTime = 0;
 }
 
@@ -1416,10 +1432,12 @@ void GameObject::Use(Unit* user, SpellEntry const* spellInfo)
     MANGOS_ASSERT(user || PrintEntryError("GameObject::Use (without user)"));
 
     // by default spell caster is user
-    Unit* spellCaster = user;
+    WorldObject* spellCaster = user;
     uint32 spellId = 0;
     uint32 triggeredFlags = 0;
     bool originalCaster = true;
+
+    std::function<void()> onSuccess;
 
     if (user->IsPlayer() && GetGoType() != GAMEOBJECT_TYPE_TRAP) // workaround for GO casting
         if (!spellInfo && !m_goInfo->IsUsableMounted())
@@ -1689,12 +1707,7 @@ void GameObject::Use(Unit* user, SpellEntry const* spellInfo)
                 {
                     DEBUG_FILTER_LOG(LOG_FILTER_AI_AND_MOVEGENSS, "Goober ScriptStart id %u for %s (Used by %s).", info->goober.eventId, GetGuidStr().c_str(), player->GetGuidStr().c_str());
 
-                    // for battleground events we need to allow the event id to be forwarded
-                    // Note: this exception is required in order not to change the legacy even handling in DB scripts
-                    if (GetMap()->IsBattleGround())
-                        StartEvents_Event(GetMap(), info->goober.eventId, this, player, true, player);
-                    else
-                        StartEvents_Event(GetMap(), info->goober.eventId, player, this);
+                    StartEvents_Event(GetMap(), info->goober.eventId, player, this);
                 }
 
                 // possible quest objective for active quests
@@ -1918,17 +1931,20 @@ void GameObject::Use(Unit* user, SpellEntry const* spellInfo)
                     return;
             }
 
-            if (spellCaster->CastSpell(user, info->spellcaster.spellId, TRIGGERED_OLD_TRIGGERED, nullptr, nullptr, GetObjectGuid()) != SPELL_CAST_OK)
-                return;
+            spellId = info->spellcaster.spellId;
+            spellCaster = this;
 
-            AddUse();
+            onSuccess = [&]()
+            {
+                AddUse();
 
-            // Previously we locked all spellcasters on use with no real indication why
-            // or timeout of the locking. Now only doing it on it being consumed to prevent further use.
-            // spellcaster GOs like city portals should never be locked
-            if (info->spellcaster.charges > 0 && !GetUseCount())
-                SetUInt32Value(GAMEOBJECT_FLAGS, GO_FLAG_LOCKED);
-            return;
+                // Previously we locked all spellcasters on use with no real indication why
+                // or timeout of the locking. Now only doing it on it being consumed to prevent further use.
+                // spellcaster GOs like city portals should never be locked
+                if (info->spellcaster.charges > 0 && !GetUseCount())
+                    SetUInt32Value(GAMEOBJECT_FLAGS, GO_FLAG_LOCKED);
+            };
+            break;
         }
         case GAMEOBJECT_TYPE_MEETINGSTONE:                  // 23
         {
@@ -1972,19 +1988,13 @@ void GameObject::Use(Unit* user, SpellEntry const* spellInfo)
 
             if (player->CanUseBattleGroundObject())
             {
-                // Note: object is used in battlegrounds;
-                // it's spawned by default in Warsong Gulch, Arathi Basin and Eye of the Storm
-                BattleGround* bg = player->GetBattleGround();
-                if (bg)
-                    bg->HandlePlayerClickedOnFlag(player, this);
-
                 // handle spell data if available; this usually marks the player as the flag carrier in a battleground
                 GameObjectInfo const* info = GetGOInfo();
                 if (info && info->flagstand.pickupSpell)
+                {
                     spellId = info->flagstand.pickupSpell;
-
-                // when clicked the flag despawns
-                SetLootState(GO_JUST_DEACTIVATED);
+                    spellCaster = this;
+                }
             }
             break;
         }
@@ -2017,13 +2027,11 @@ void GameObject::Use(Unit* user, SpellEntry const* spellInfo)
                 GameObjectInfo const* info = GetGOInfo();
                 if (info && info->flagdrop.eventID)
                 {
-                    StartEvents_Event(GetMap(), info->flagdrop.eventID, this, player, true, player);
+                    StartEvents_Event(GetMap(), info->flagdrop.eventID, this, player, true);
 
                     // handle spell data if available; this usually marks the player as the flag carrier in a battleground
                     spellId = info->flagdrop.pickupSpell;
-
-                    // despawn the flag after click
-                    SetLootState(GO_JUST_DEACTIVATED);
+                    spellCaster = this;
                 }
             }
             break;
@@ -2154,14 +2162,14 @@ void GameObject::SetLocalRotationAngles(float z_rot, float y_rot, float x_rot)
     SetLocalRotation(quat.x, quat.y, quat.z, quat.w);
 }
 
-void GameObject::SetLootState(LootState state)
+void GameObject::SetLootState(LootState state, Unit* user/*= nullptr*/)
 {
     m_lootState = state;
     UpdateCollisionState();
 
     // Call for GameObjectAI script
     if (m_AI)
-        m_AI->OnLootStateChange();
+        m_AI->OnLootStateChange(user);
 }
 
 void GameObject::SetGoState(GOState state)
@@ -2322,7 +2330,7 @@ struct AddGameObjectToRemoveListInMapsWorker
     void operator()(Map* map)
     {
         if (GameObject* pGameobject = map->GetGameObject(i_guid))
-            pGameobject->AddObjectToRemoveList();
+            pGameobject->Delete();
     }
 
     ObjectGuid i_guid;
@@ -2576,7 +2584,7 @@ void GameObject::TickCapturePoint()
     }
 
     if (eventId)
-        StartEvents_Event(GetMap(), eventId, this, this, true, *capturingPlayers.begin());
+        StartEvents_Event(GetMap(), eventId, this, *capturingPlayers.begin(), true);
 }
 
 // ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2630,7 +2638,7 @@ void GameObject::ForceGameObjectHealth(int32 diff, Unit* caster)
         m_useTimes = GetMaxHealth();
         // Start Event if exist
         if (caster && m_goInfo->destructibleBuilding.rebuildingEvent)
-            StartEvents_Event(GetMap(), m_goInfo->destructibleBuilding.rebuildingEvent, this, caster->GetBeneficiary(), true, caster->GetBeneficiary());
+            StartEvents_Event(GetMap(), m_goInfo->destructibleBuilding.rebuildingEvent, this, caster->GetBeneficiary(), true);
     }
     else                                                    // Set to value
         m_useTimes = uint32(diff);
@@ -2648,7 +2656,7 @@ void GameObject::ForceGameObjectHealth(int32 diff, Unit* caster)
 
         // Start Event if exist
         if (caster && m_goInfo->destructibleBuilding.intactEvent)
-            StartEvents_Event(GetMap(), m_goInfo->destructibleBuilding.intactEvent, this, caster->GetBeneficiary(), true, caster->GetBeneficiary());
+            StartEvents_Event(GetMap(), m_goInfo->destructibleBuilding.intactEvent, this, caster->GetBeneficiary(), true);
     }
     else if (m_useTimes == 0)                               // Destroyed
     {
@@ -2675,7 +2683,7 @@ void GameObject::ForceGameObjectHealth(int32 diff, Unit* caster)
 
             // Start Event if exist
             if (caster && m_goInfo->destructibleBuilding.destroyedEvent)
-                StartEvents_Event(GetMap(), m_goInfo->destructibleBuilding.destroyedEvent, this, caster->GetBeneficiary(), true, caster->GetBeneficiary());
+                StartEvents_Event(GetMap(), m_goInfo->destructibleBuilding.destroyedEvent, this, caster->GetBeneficiary(), true);
         }
     }
     else if (m_useTimes <= m_goInfo->destructibleBuilding.damagedNumHits) // Damaged
@@ -2694,7 +2702,7 @@ void GameObject::ForceGameObjectHealth(int32 diff, Unit* caster)
 
             // Start Event if exist
             if (caster && m_goInfo->destructibleBuilding.damagedEvent)
-                StartEvents_Event(GetMap(), m_goInfo->destructibleBuilding.damagedEvent, this, caster->GetBeneficiary(), true, caster->GetBeneficiary());
+                StartEvents_Event(GetMap(), m_goInfo->destructibleBuilding.damagedEvent, this, caster->GetBeneficiary(), true);
         }
     }
 

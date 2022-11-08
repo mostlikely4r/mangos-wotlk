@@ -432,7 +432,7 @@ void ScriptMgr::LoadScripts(ScriptMapMapName& scripts, const char* tablename)
                     continue;
                 }
 
-                if (info->type != GAMEOBJECT_TYPE_DOOR)
+                if (info->type != GAMEOBJECT_TYPE_DOOR && info->type != GAMEOBJECT_TYPE_BUTTON)
                 {
                     sLog.outErrorDb("Table `%s` has gameobject type (%u) non supported by command %s for script id %u", tablename, info->id, (tmp.command == SCRIPT_COMMAND_OPEN_DOOR ? "SCRIPT_COMMAND_OPEN_DOOR" : "SCRIPT_COMMAND_CLOSE_DOOR"), tmp.id);
                     continue;
@@ -522,7 +522,7 @@ void ScriptMgr::LoadScripts(ScriptMapMapName& scripts, const char* tablename)
             }
             case SCRIPT_COMMAND_MOVEMENT:                   // 20
             {
-                if (tmp.movement.movementType >= MAX_DB_MOTION_TYPE && tmp.movement.movementType != EFFECT_MOTION_TYPE)
+                if (tmp.movement.movementType >= MAX_DB_MOTION_TYPE && tmp.movement.movementType != EFFECT_MOTION_TYPE && tmp.movement.movementType != FALL_MOTION_TYPE)
                 {
                     sLog.outErrorDb("Table `%s` SCRIPT_COMMAND_MOVEMENT has invalid MovementType %u for script id %u",
                                     tablename, tmp.movement.movementType, tmp.id);
@@ -905,6 +905,15 @@ void ScriptMgr::LoadScripts(ScriptMapMapName& scripts, const char* tablename)
                 }
                 break;
             }
+            case SCRIPT_COMMAND_SET_SHEATHE:                // 54
+            {
+                if (tmp.setSheathe.sheatheState > SHEATH_STATE_RANGED)
+                {
+                    sLog.outErrorDb("Table `%s` has invalid sheathe state assigned %d", tablename, tmp.setSheathe.sheatheState);
+                    continue;
+                }
+                break;
+            }
             default:
             {
                 sLog.outErrorDb("Table `%s` unknown command %u, skipping.", tablename, tmp.command);
@@ -1236,7 +1245,6 @@ bool ScriptAction::GetScriptProcessTargets(WorldObject* originalSource, WorldObj
             WorldObject* buddy = nullptr;
             if (m_script->IsCreatureBuddy())
             {
-                CreatureData const* cData = sObjectMgr.GetCreatureData(m_script->searchRadiusOrGuid);
                 buddy = m_map->GetCreature(m_script->searchRadiusOrGuid);
 
                 if (buddy && ((Creature*)buddy)->IsAlive() == m_script->IsDeadOrDespawnedBuddy())
@@ -1249,10 +1257,8 @@ bool ScriptAction::GetScriptProcessTargets(WorldObject* originalSource, WorldObj
                 }
             }
             else
-            {
-                GameObjectData const* oData = sObjectMgr.GetGOData(m_script->searchRadiusOrGuid);
-                buddy = m_map->GetGameObject(ObjectGuid(HIGHGUID_GAMEOBJECT, oData->id, m_script->searchRadiusOrGuid));
-            }
+                buddy = m_map->GetGameObject(m_script->searchRadiusOrGuid);
+
             // TODO Maybe load related grid if not already done? How to handle multi-map case?
             if (!buddy && m_script->command != SCRIPT_COMMAND_TERMINATE_SCRIPT)
             {
@@ -1827,8 +1833,7 @@ bool ScriptAction::ExecuteDbscriptCommand(WorldObject* pSource, WorldObject* pTa
                 if (!goData)
                     break;                                  // checked at load
 
-                // TODO - This was a change, was before current map of source
-                pGo = m_map->GetGameObject(ObjectGuid(HIGHGUID_GAMEOBJECT, goData->id, m_script->respawnGo.goGuid));
+                pGo = m_map->GetGameObject(m_script->respawnGo.goGuid);
             }
             else
             {
@@ -1920,7 +1925,7 @@ bool ScriptAction::ExecuteDbscriptCommand(WorldObject* pSource, WorldObject* pTa
                 break;
             }
 
-            if (door->GetGoType() != GAMEOBJECT_TYPE_DOOR)
+            if (door->GetGoType() != GAMEOBJECT_TYPE_DOOR && door->GetGoType() != GAMEOBJECT_TYPE_BUTTON)
             {
                 sLog.outErrorDb(" DB-SCRIPTS: Process table `%s` id %u, command %u failed for non-door(GoType: %u).", m_table, m_script->id, m_script->command, door->GetGoType());
                 break;
@@ -2167,6 +2172,12 @@ bool ScriptAction::ExecuteDbscriptCommand(WorldObject* pSource, WorldObject* pTa
                     source->StopMoving();
                     float speed = m_script->speed == 0.f ? source->GetSpeed(MOVE_RUN) : m_script->speed;
                     source->GetMotionMaster()->MoveJumpFacing(Position(m_script->x, m_script->y, m_script->z, 100.f), speed, m_script->movementFloat.verticalSpeed, 10001u, targetGuid, wanderORpathId);
+                    break;
+                }
+                case FALL_MOTION_TYPE:
+                {
+                    source->StopMoving();
+                    source->GetMotionMaster()->MoveFall();
                     break;
                 }
             }
@@ -2646,7 +2657,7 @@ bool ScriptAction::ExecuteDbscriptCommand(WorldObject* pSource, WorldObject* pTa
                 sender = MailSender(pSource);
             uint32 deliverDelay = m_script->textId[0] > 0 ? (uint32)m_script->textId[0] : 0;
 
-            MailDraft(m_script->sendMail.mailTemplateId).SendMailTo(static_cast<Player*>(pTarget), sender, MAIL_CHECK_MASK_HAS_BODY, deliverDelay);
+            MailDraft(m_script->sendMail.mailTemplateId).SetMoney(m_script->sendMail.money).SendMailTo(static_cast<Player*>(pTarget), sender, MAIL_CHECK_MASK_HAS_BODY, deliverDelay);
             break;
         }
         case SCRIPT_COMMAND_SET_HOVER:                      // 39
@@ -2664,6 +2675,7 @@ bool ScriptAction::ExecuteDbscriptCommand(WorldObject* pSource, WorldObject* pTa
             }
 
             ((Creature*)pSource)->SetHover(m_script->fly.fly);
+            ((Creature*)pSource)->SetLevitate(m_script->fly.fly); // wotlk+ - enable setting only one if its needed in wotlk one day
             break;
         }
         case SCRIPT_COMMAND_DESPAWN_GO:                     // 40
@@ -3074,6 +3086,14 @@ bool ScriptAction::ExecuteDbscriptCommand(WorldObject* pSource, WorldObject* pTa
             m_map->GetVariableManager().SetVariable(m_script->textId[0], m_script->textId[1]);
             break;
         }
+        case SCRIPT_COMMAND_SET_SHEATHE:
+        {
+            if (LogIfNotUnit(pSource))
+                break;
+
+            static_cast<Unit*>(pSource)->SetSheath(SheathState(m_script->setSheathe.sheatheState));
+            break;
+        }
         default:
             sLog.outErrorDb(" DB-SCRIPTS: Process table `%s` id %u, command %u unknown command used.",
                 m_table, m_script->id, m_script->command);
@@ -3196,7 +3216,7 @@ void ScriptMgr::CollectPossibleEventIds(std::set<uint32>& eventIds)
 }
 
 // Starters for events
-bool StartEvents_Event(Map* map, uint32 id, Object* source, Object* target, bool isStart/*=true*/, Unit* forwardToPvp/*=nullptr*/)
+bool StartEvents_Event(Map* map, uint32 id, Object* source, Object* target, bool isStart/*=true*/)
 {
     MANGOS_ASSERT(source);
 
@@ -3205,28 +3225,25 @@ bool StartEvents_Event(Map* map, uint32 id, Object* source, Object* target, bool
         return true;
 
     // Handle PvP Calls
-    if (forwardToPvp && source->GetTypeId() == TYPEID_GAMEOBJECT)
+    if (source->IsGameObject() || source->IsUnit())
     {
         BattleGround* bg = nullptr;
         OutdoorPvP* opvp = nullptr;
-        if (forwardToPvp->GetTypeId() == TYPEID_PLAYER)
-        {
-            bg = ((Player*)forwardToPvp)->GetBattleGround();
-            if (!bg)
-                opvp = sOutdoorPvPMgr.GetScript(((Player*)forwardToPvp)->GetCachedZoneId());
-        }
+        uint32 zoneId = 0;
+        if (source->IsPlayer())
+            zoneId = static_cast<Player*>(source)->GetCachedZoneId();
         else
-        {
-            if (map->IsBattleGroundOrArena())
-                bg = ((BattleGroundMap*)map)->GetBG();
-            else                                            // Use the go, because GOs don't move
-                opvp = sOutdoorPvPMgr.GetScript(((GameObject*)source)->GetZoneId());
-        }
+            zoneId = static_cast<WorldObject*>(source)->GetZoneId();
 
-        if (bg && bg->HandleEvent(id, static_cast<GameObject*>(source), forwardToPvp))
+        if (map->IsBattleGroundOrArena())
+            bg = static_cast<BattleGroundMap*>(map)->GetBG();
+        else                                            // Use the go, because GOs don't move
+            opvp = sOutdoorPvPMgr.GetScript(zoneId);
+
+        if (bg && bg->HandleEvent(id, source, target))
             return true;
 
-        if (opvp && opvp->HandleEvent(id, static_cast<GameObject*>(source), forwardToPvp))
+        if (opvp && opvp->HandleEvent(id, source, target))
             return true;
     }
 

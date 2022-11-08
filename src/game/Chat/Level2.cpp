@@ -964,6 +964,9 @@ bool ChatHandler::HandleGameObjectTargetCommand(char* args)
 
         ShowNpcOrGoSpawnInformation<GameObject>(target->GetGUIDLow());
 
+        if (SpawnGroupEntry* groupEntry = pl->GetMap()->GetMapDataContainer().GetSpawnGroupByGuid(target->GetDbGuid(), TYPEID_GAMEOBJECT))
+            PSendSysMessage("Spawn Group: %u", groupEntry->Id);
+
         if (target->GetGoType() == GAMEOBJECT_TYPE_DOOR)
             PSendSysMessage(LANG_COMMAND_GO_STATUS_DOOR, uint32(target->GetGoState()), uint32(target->GetLootState()), GetOnOffStr(target->IsCollisionEnabled()), goI && goI->door.startOpen ? "open" : "closed");
         else
@@ -1273,7 +1276,12 @@ bool ChatHandler::HandleGameObjectNearCommand(char* args)
             if (gInfo)
                 name = gInfo->name;
 
-            PSendSysMessage(LANG_GO_MIXED_LIST_CHAT, guid, PrepareStringNpcOrGoSpawnInformation<GameObject>(guid).c_str(), entry, guid, name, x, y, z, mapid);
+            uint32 spawnGroupId = 0;
+            if (SpawnGroupEntry* groupEntry = pl->GetMap()->GetMapDataContainer().GetSpawnGroupByGuid(guid, TYPEID_GAMEOBJECT))
+                spawnGroupId = groupEntry->Id;
+
+            PSendSysMessage(LANG_GO_MIXED_LIST_CHAT, guid, PrepareStringNpcOrGoSpawnInformation<GameObject>(guid).c_str(), entry, guid, name, x, y, z, mapid, spawnGroupId);
+
 
             ++count;
         }
@@ -1396,7 +1404,10 @@ bool ChatHandler::HandleGameObjectNearSpawnedCommand(char* args)
         float x, y, z;
         go->GetPosition(x, y, z);
         ObjectGuid guid = go->GetObjectGuid();
-        PSendSysMessage(LANG_GO_MIXED_LIST_CHAT, guid.GetCounter(), PrepareStringNpcOrGoSpawnInformation<GameObject>(guid).c_str(), entry, guid, goInfo->name, x, y, z, go->GetMapId());
+        uint32 spawnGroupId = 0;
+        if (SpawnGroupEntry* groupEntry = player->GetMap()->GetMapDataContainer().GetSpawnGroupByGuid(guid, TYPEID_GAMEOBJECT))
+            spawnGroupId = groupEntry->Id;
+        PSendSysMessage(LANG_GO_MIXED_LIST_CHAT, guid.GetCounter(), PrepareStringNpcOrGoSpawnInformation<GameObject>(guid).c_str(), entry, guid, goInfo->name, x, y, z, go->GetMapId(), spawnGroupId);
     }
 
     PSendSysMessage(LANG_COMMAND_NEAROBJMESSAGE, distance, gameobjects.size());
@@ -2287,10 +2298,31 @@ bool ChatHandler::HandleNpcFactionIdCommand(char* args)
 // set spawn dist of creature
 bool ChatHandler::HandleNpcSpawnDistCommand(char* args)
 {
-    if (!*args)
+    Creature* pCreature = getSelectedCreature();
+    if (!pCreature)
+    {
+        SendSysMessage(LANG_SELECT_CREATURE);
+        SetSentErrorMessage(true);
         return false;
+    }
 
-    float option = (float)atof(args);
+    float spawnDist = pCreature->GetRespawnRadius();
+    PSendSysMessage("Current spawn dist is %4.2f", spawnDist);
+
+    if (!*args)
+        return true;
+
+    float option;
+    try
+    {
+        option = (float)std::stod(args);
+    }
+    catch (std::invalid_argument)
+    {
+        // string was not a float representation
+        return false;
+    }
+
     if (option < 0.0f)
     {
         SendSysMessage(LANG_BAD_VALUE);
@@ -2300,10 +2332,6 @@ bool ChatHandler::HandleNpcSpawnDistCommand(char* args)
     MovementGeneratorType mtype = IDLE_MOTION_TYPE;
     if (option > 0.0f)
         mtype = RANDOM_MOTION_TYPE;
-
-    Creature* pCreature = getSelectedCreature();
-    if (!pCreature)
-        return false;
 
     pCreature->SetRespawnRadius(option);
     pCreature->SetDefaultMovementType(mtype);

@@ -2171,7 +2171,7 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
         }
     }
 
-    if ((GetMapId() == mapid) && (!m_transport))            // TODO the !m_transport might have unexpected effects when teleporting from transport to other place on same map
+    if ((GetMapId() == mapid))
     {
         // lets reset far teleport flag if it wasn't reset during chained teleports
         SetSemaphoreTeleportFar(false);
@@ -2802,6 +2802,23 @@ void Player::SetGMVisible(bool on)
 
         SetVisibility(VISIBILITY_OFF);
     }
+}
+
+bool Player::isAllowedWhisperFrom(ObjectGuid guid)
+{
+    if (PlayerSocial* social = GetSocial())
+        if (social->HasFriend(guid))
+            return true;
+
+    if (Group* group = GetGroup())
+        if (group->IsMember(guid))
+            return true;
+
+    if (Guild* guild = sGuildMgr.GetGuildById(GetGuildId()))
+        if (guild->GetMemberSlot(guid))
+            return true;
+
+    return false;
 }
 
 ///- If the player is invited, remove him. If the group if then only 1 person, disband the group.
@@ -4288,8 +4305,8 @@ void Player::SendItemRetrievalMail(uint32 itemEntry, uint32 count)
         draft.AddItem(item);
     }
 
-    draft.SendMailTo(MailReceiver(this, GetObjectGuid()), sender);
     CharacterDatabase.CommitTransaction();
+    draft.SendMailTo(MailReceiver(this, GetObjectGuid()), sender);
 }
 
 void Player::SaveItemToInventory(Item* item)
@@ -7534,7 +7551,8 @@ void Player::UpdateZone(uint32 newZone, uint32 newArea, bool force)
     if (!zone)
         return;
 
-    if (m_zoneUpdateId != newZone || force)
+    bool updateZone = m_zoneUpdateId != newZone || force;
+    if (updateZone)
     {
         // handle outdoor pvp zones
         sOutdoorPvPMgr.HandlePlayerLeaveZone(this, m_zoneUpdateId);
@@ -7547,17 +7565,19 @@ void Player::UpdateZone(uint32 newZone, uint32 newArea, bool force)
             Weather* wth = GetMap()->GetWeatherSystem()->FindOrCreateWeather(newZone);
             wth->SendWeatherUpdateToPlayer(this);
         }
-
-        GetMap()->SendZoneDynamicInfo(this);
     }
 
-    if (m_areaUpdateId != newArea || force)
+    bool updateArea = m_areaUpdateId != newArea || force;
+    if (updateArea)
     {
         SendInitWorldStates(newZone, newArea); // only if really enters to new zone, not just area change, works strange...
 
         sWorldState.HandlePlayerLeaveArea(this, m_areaUpdateId);
         sWorldState.HandlePlayerEnterArea(this, newArea);
     }
+
+    if (updateZone || updateArea)
+        GetMap()->SendZoneDynamicInfo(this, updateZone, updateArea);
 
     m_zoneUpdateId    = newZone;
     m_zoneUpdateTimer = ZONE_UPDATE_INTERVAL;
@@ -8816,16 +8836,22 @@ void Player::RemovedInsignia(Player* looterPlr)
         return;
 
     // If not released spirit, do it !
+    bool repop = false;
     if (m_deathTimer > 0)
     {
         m_deathTimer = 0;
         BuildPlayerRepop();
         RepopAtGraveyard();
+        repop = true;
     }
 
     Corpse* corpse = GetCorpse();
     if (!corpse)
         return;
+
+    WorldPacket data(SMSG_PLAYER_SKINNED, 0);
+    data << uint8(repop);
+    GetSession()->SendPacket(data);
 
     // We have to convert player corpse to bones, not to be able to resurrect there
     // SpawnCorpseBones isn't handy, 'cos it saves player while he in BG
@@ -8899,50 +8925,6 @@ void Player::SendInitWorldStates(uint32 zoneid, uint32 areaid) const
         case 4197:                                          // Wintergrasp
             if (OutdoorPvP* outdoorPvP = sOutdoorPvPMgr.GetScript(zoneid))
                 outdoorPvP->FillInitialWorldStates(data, count);
-            break;
-        case 2597:                                          // AV
-            if (bg && bg->GetTypeId() == BATTLEGROUND_AV)
-                bg->FillInitialWorldStates(data, count);
-            break;
-        case 3277:                                          // WS
-            if (bg && bg->GetTypeId() == BATTLEGROUND_WS)
-                bg->FillInitialWorldStates(data, count);
-            break;
-        case 3358:                                          // AB
-            if (bg && bg->GetTypeId() == BATTLEGROUND_AB)
-                bg->FillInitialWorldStates(data, count);
-            break;
-        case 3820:                                          // EY
-            if (bg && bg->GetTypeId() == BATTLEGROUND_EY)
-                bg->FillInitialWorldStates(data, count);
-            break;
-        case 3698:                                          // Nagrand Arena
-            if (bg && bg->GetTypeId() == BATTLEGROUND_NA)
-                bg->FillInitialWorldStates(data, count);
-            break;
-        case 3702:                                          // Blade's Edge Arena
-            if (bg && bg->GetTypeId() == BATTLEGROUND_BE)
-                bg->FillInitialWorldStates(data, count);
-            break;
-        case 3968:                                          // Ruins of Lordaeron
-            if (bg && bg->GetTypeId() == BATTLEGROUND_RL)
-                bg->FillInitialWorldStates(data, count);
-            break;
-        case 4378:                                          // Dalaran Severs
-            if (bg && bg->GetTypeId() == BATTLEGROUND_DS)
-                bg->FillInitialWorldStates(data, count);
-            break;
-        case 4384:                                          // Strand of the Ancients
-            if (bg && bg->GetTypeId() == BATTLEGROUND_SA)
-                bg->FillInitialWorldStates(data, count);
-            break;
-        case 4406:                                          // Ring of Valor
-            if (bg && bg->GetTypeId() == BATTLEGROUND_RV)
-                bg->FillInitialWorldStates(data, count);
-            break;
-        case 4710:                                          // Isle of Conquest
-            if (bg && bg->GetTypeId() == BATTLEGROUND_IC)
-                bg->FillInitialWorldStates(data, count);
             break;
     }
 
@@ -23672,7 +23654,12 @@ void Player::_LoadSkills(QueryResult* result)
                     continue;
 
                 if (entry->flags & SKILL_FLAG_MAXIMIZED)
-                    value = max = GetSkillMaxForLevel();
+                {
+                    if (entry->flags & SKILL_FLAG_DISPLAY_AS_MONO)
+                        max = GetSkillMaxForLevel();
+                    
+                    value = max;
+                }
 
                 if (SkillTiersEntry const* steps = sSkillTiersStore.LookupEntry(entry->skillTierId))
                 {

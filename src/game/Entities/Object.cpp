@@ -46,6 +46,7 @@
 #include "Loot/LootMgr.h"
 #include "Spells/SpellMgr.h"
 #include "MotionGenerators/PathFinder.h"
+#include "Movement/MoveSpline.h"
 
 Object::Object(): m_updateFlag(0), m_itsNewObject(false), m_dbGuid(0)
 {
@@ -298,7 +299,15 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 updateFlags) const
             const_cast<Unit*>(unit)->m_movementInfo.RemoveMovementFlag(MOVEFLAG_ONTRANSPORT);
 
         // Write movement info
-        *data << unit->m_movementInfo;
+        // TODO: Move boarding and unboarding and root enable/disable to movement generator
+        if ((unit->m_movementInfo.GetMovementFlags() & MOVEFLAG_SPLINE_ENABLED) && unit->movespline->IsBoarding())
+        {
+            MovementInfo info = unit->m_movementInfo;
+            info.RemoveMovementFlag(MOVEFLAG_ROOT);
+            *data << info;
+        }
+        else
+            *data << unit->m_movementInfo;
 
         // Unit speeds
         *data << float(unit->GetSpeed(MOVE_WALK));
@@ -1784,12 +1793,15 @@ void WorldObject::MovePositionToFirstCollision(Position& pos, float dist, float 
         }
         UpdateAllowedPositionZ(dest.x, dest.y, dest.z);
         path.calculate(src, dest, false, true);
-        if (path.getPathType())
+        if ((path.getPathType() & PATHFIND_NOPATH) == 0)
         {
             G3D::Vector3 result = path.getPath().back();
             destX = result.x;
             destY = result.y;
             destZ = result.z;
+            // no collision detected - reset height
+            if (dest.z == result.z)
+                destZ -= halfHeight;
             if (transport) // transport produces offset, but we need global pos
                 transport->CalculatePassengerPosition(destX, destY, destZ);
         }

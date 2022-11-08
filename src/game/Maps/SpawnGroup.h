@@ -47,7 +47,7 @@ class SpawnGroup
         virtual void Update();
         uint32 GetEligibleEntry(std::map<uint32, uint32>& existingEntries, std::map<uint32, uint32>& minEntries);
         virtual void Spawn(bool force);
-        virtual void Despawn() = 0;
+        virtual void Despawn(uint32 timeMSToDespawn = 0) = 0;
         std::string to_string() const;
         uint32 GetObjectTypeId() const { return m_objectTypeId; }
         void SetEnabled(bool enabled) { m_enabled = enabled; }
@@ -89,7 +89,11 @@ class CreatureGroup : public SpawnGroup
 
         void MoveHome();
 
-        void Despawn() override;
+        void Despawn(uint32 timeMSToDespawn = 0) override { Despawn(timeMSToDespawn, true); };
+        void Despawn(uint32 timeMSToDespawn, bool onlyAlive);
+
+        bool IsOutOfCombat();
+        bool IsEvading();
 
     private:
         void ClearRespawnTimes();
@@ -107,7 +111,7 @@ class GameObjectGroup : public SpawnGroup
         GameObjectGroup(SpawnGroupEntry const& entry, Map& map);
         void RemoveObject(WorldObject* wo) override;
 
-        void Despawn() override;
+        void Despawn(uint32 timeMSToDespawn = 0) override;
 };
 
 class FormationSlotData
@@ -195,6 +199,7 @@ class FormationData
         void Reset();
         void Disband();
         void OnDeath(Creature* creature);
+        void OnHome();
         void OnDelete(Creature* creature);
         void OnWPStartNode() { m_mirrorState = false; };
         void OnWPEndNode() { m_mirrorState = true; };
@@ -212,6 +217,8 @@ class FormationData
 
         FormationEntrySPtr GetFormationEntry() const { return m_fEntry; }
         void SetMovementInfo(MovementGeneratorType moveType, uint32 pahtId);
+
+        void ResetLastWP() { m_lastWP = 0; }
 
     private:
         void SetMasterMovement();
@@ -240,6 +247,7 @@ class FormationData
 
         bool m_mirrorState;
         bool m_followerStopped;
+        bool m_masterDied;
 
         uint32 m_realMasterDBGuid;
         uint32 m_slotGuid;

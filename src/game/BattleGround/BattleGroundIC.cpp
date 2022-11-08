@@ -40,8 +40,34 @@ void BattleGroundIC::Reset()
     // call parent's class reset
     BattleGround::Reset();
 
+    GetBgMap()->GetVariableManager().SetVariableData(BG_IC_STATE_ALLY_REINFORCE_SHOW, true, 0, 0);
+    GetBgMap()->GetVariableManager().SetVariableData(BG_IC_STATE_HORDE_REINFORCE_SHOW, true, 0, 0);
+    GetBgMap()->GetVariableManager().SetVariableData(BG_IC_STATE_ALLY_REINFORCE_COUNT, true, 0, 0);
+    GetBgMap()->GetVariableManager().SetVariableData(BG_IC_STATE_HORDE_REINFORCE_COUNT, true, 0, 0);
+
+    for (const auto& data : isleGameObjectNeutralData)
+    {
+        GetBgMap()->GetVariableManager().SetVariableData(data.nextWorldStateAlly, true, 0, 0);
+        GetBgMap()->GetVariableManager().SetVariableData(data.nextWorldStateHorde, true, 0, 0);
+    }
+
+    for (const auto& data : isleGameObjectContestedData)
+    {
+        GetBgMap()->GetVariableManager().SetVariableData(data.nextStateAssault, true, 0, 0);
+        GetBgMap()->GetVariableManager().SetVariableData(data.nextStateDefend, true, 0, 0);
+    }
+
+    for (const auto& data : isleGameObjectConquerData)
+        GetBgMap()->GetVariableManager().SetVariableData(data.nextState, true, 0, 0);
+
+    for (const auto& data : isleGameObjectOwnedData)
+        GetBgMap()->GetVariableManager().SetVariableData(data.nextState, true, 0, 0);
+
     for (uint8 i = 0; i < PVP_TEAM_COUNT; ++i)
-        m_reinforcements[i] = BG_IC_MAX_REINFORCEMENTS;
+        SetReinforcements(PvpTeamIndex(i), BG_IC_MAX_REINFORCEMENTS);
+
+    GetBgMap()->GetVariableManager().SetVariable(BG_IC_STATE_ALLY_REINFORCE_SHOW, WORLD_STATE_ADD);
+    GetBgMap()->GetVariableManager().SetVariable(BG_IC_STATE_HORDE_REINFORCE_SHOW, WORLD_STATE_ADD);
 
     // setup the owner and state for all objectives
     for (uint8 i = 0; i < BG_IC_MAX_OBJECTIVES; ++i)
@@ -80,6 +106,17 @@ void BattleGroundIC::Reset()
     m_closeDoorTimer = 0;
     m_isKeepInvaded[TEAM_INDEX_ALLIANCE] = false;
     m_isKeepInvaded[TEAM_INDEX_HORDE] = false;
+
+    // show the capturable bases
+    for (uint8 i = 0; i < BG_IC_MAX_OBJECTIVES; ++i)
+        GetBgMap()->GetVariableManager().SetVariable(m_isleNode[i].nodeWorldState, WORLD_STATE_ADD);
+
+    // show the walls
+    for (uint8 i = 0; i < BG_IC_MAX_KEEP_GATES; ++i)
+        GetBgMap()->GetVariableManager().SetVariable(m_gatesAllianceState[i], WORLD_STATE_ADD);
+
+    for (uint8 i = 0; i < BG_IC_MAX_KEEP_GATES; ++i)
+        GetBgMap()->GetVariableManager().SetVariable(m_gatesHordeState[i], WORLD_STATE_ADD);
 
     // setup master graveyards
     GetBgMap()->GetGraveyardManager().SetGraveYardLinkTeam(BG_IC_GRAVEYARD_ID_ALLIANCE, BG_IC_ZONE_ID_ISLE, ALLIANCE);
@@ -202,38 +239,23 @@ void BattleGroundIC::UpdatePlayerScore(Player* source, uint32 type, uint32 value
     }
 }
 
-void BattleGroundIC::FillInitialWorldStates(WorldPacket& data, uint32& count)
-{
-    // show the reinforcements
-    FillInitialWorldState(data, count, BG_IC_STATE_ALLY_REINFORCE_SHOW, WORLD_STATE_ADD);
-    FillInitialWorldState(data, count, BG_IC_STATE_HORDE_REINFORCE_SHOW, WORLD_STATE_ADD);
-    FillInitialWorldState(data, count, BG_IC_STATE_ALLY_REINFORCE_COUNT, m_reinforcements[TEAM_INDEX_ALLIANCE]);
-    FillInitialWorldState(data, count, BG_IC_STATE_HORDE_REINFORCE_COUNT, m_reinforcements[TEAM_INDEX_HORDE]);
-
-    // show the capturable bases
-    for (uint8 i = 0; i < BG_IC_MAX_OBJECTIVES; ++i)
-        FillInitialWorldState(data, count, m_isleNode[i].nodeWorldState, WORLD_STATE_ADD);
-
-    // show the walls
-    for (uint8 i = 0; i < BG_IC_MAX_KEEP_GATES; ++i)
-        FillInitialWorldState(data, count, m_gatesAllianceState[i], WORLD_STATE_ADD);
-
-    for (uint8 i = 0; i < BG_IC_MAX_KEEP_GATES; ++i)
-        FillInitialWorldState(data, count, m_gatesHordeState[i], WORLD_STATE_ADD);
-}
-
 // process the gate events
-bool BattleGroundIC::HandleEvent(uint32 eventId, GameObject* go, Unit* invoker)
+bool BattleGroundIC::HandleEvent(uint32 eventId, Object* source, Object* target)
 {
+    if (!source->IsGameObject())
+        return false;
+
+    GameObject* go = static_cast<GameObject*>(source);
+
     DEBUG_LOG("BattleGroundIC: Handle event for gameobject entry %u.", go->GetEntry());
 
     for (uint8 i = 0; i < BG_IC_MAX_KEEP_GATES; ++i)
     {
         if (eventId == isleAllianceWallsData[i].eventId)
         {
-            UpdateWorldState(m_gatesAllianceState[i], WORLD_STATE_REMOVE);
+            GetBgMap()->GetVariableManager().SetVariable(m_gatesAllianceState[i], WORLD_STATE_REMOVE);
             m_gatesAllianceState[i] = isleAllianceWallsData[i].stateOpened;
-            UpdateWorldState(m_gatesAllianceState[i], WORLD_STATE_ADD);
+            GetBgMap()->GetVariableManager().SetVariable(m_gatesAllianceState[i], WORLD_STATE_ADD);
 
             if (GameObject* pGate = GetBgMap()->GetGameObject(m_keepGatesGuid[TEAM_INDEX_ALLIANCE][i]))
                 pGate->UseDoorOrButton(0, true);
@@ -265,9 +287,9 @@ bool BattleGroundIC::HandleEvent(uint32 eventId, GameObject* go, Unit* invoker)
 
         if (eventId == isleHordeWallsData[i].eventId)
         {
-            UpdateWorldState(m_gatesHordeState[i], WORLD_STATE_REMOVE);
+            GetBgMap()->GetVariableManager().SetVariable(m_gatesHordeState[i], WORLD_STATE_REMOVE);
             m_gatesHordeState[i] = isleHordeWallsData[i].stateOpened;
-            UpdateWorldState(m_gatesHordeState[i], WORLD_STATE_ADD);
+            GetBgMap()->GetVariableManager().SetVariable(m_gatesHordeState[i], WORLD_STATE_ADD);
 
             if (GameObject* pGate = GetBgMap()->GetGameObject(m_keepGatesGuid[TEAM_INDEX_HORDE][i]))
                 pGate->UseDoorOrButton(0, true);
@@ -388,9 +410,9 @@ void BattleGroundIC::HandlePlayerClickedOnFlag(Player* player, GameObject* go)
         m_isleNode[nodeId].nodeOwner = newOwnerIdx;
 
         // update world states
-        UpdateWorldState(m_isleNode[nodeId].nodeWorldState, WORLD_STATE_REMOVE);
+        GetBgMap()->GetVariableManager().SetVariable(m_isleNode[nodeId].nodeWorldState, WORLD_STATE_REMOVE);
         m_isleNode[nodeId].nodeWorldState = newWorldState;
-        UpdateWorldState(m_isleNode[nodeId].nodeWorldState, WORLD_STATE_ADD);
+        GetBgMap()->GetVariableManager().SetVariable(m_isleNode[nodeId].nodeWorldState, WORLD_STATE_ADD);
 
         // start timer
         m_isleNode[nodeId].nodeChangeTimer = BG_IC_FLAG_CAPTURING_TIME;
@@ -468,15 +490,24 @@ void BattleGroundIC::HandleKillPlayer(Player* player, Player* killer)
     DoUpdateReinforcements(killedPlayerIdx, -1);
 
     // if reached 0, the other team wins
-    if (!m_reinforcements[killedPlayerIdx])
+    if (!GetReinforcements(killedPlayerIdx))
         EndBattleGround(killer->GetTeam());
 }
 
 // Function that updates reinforcements score
 void BattleGroundIC::DoUpdateReinforcements(PvpTeamIndex teamIdx, int32 value)
 {
-    m_reinforcements[teamIdx] = m_reinforcements[teamIdx] + value;
-    UpdateWorldState(teamIdx == TEAM_INDEX_ALLIANCE ? BG_IC_STATE_ALLY_REINFORCE_COUNT : BG_IC_STATE_HORDE_REINFORCE_COUNT, m_reinforcements[teamIdx]);
+    SetReinforcements(teamIdx, GetReinforcements(teamIdx) + value);
+}
+
+int32 BattleGroundIC::GetReinforcements(PvpTeamIndex teamIdx)
+{
+    return GetBgMap()->GetVariableManager().GetVariable(teamIdx == TEAM_INDEX_ALLIANCE ? BG_IC_STATE_ALLY_REINFORCE_COUNT : BG_IC_STATE_HORDE_REINFORCE_COUNT);
+}
+
+void BattleGroundIC::SetReinforcements(PvpTeamIndex teamIdx, int32 reinforcements)
+{
+    GetBgMap()->GetVariableManager().SetVariable(teamIdx == TEAM_INDEX_ALLIANCE ? BG_IC_STATE_ALLY_REINFORCE_COUNT : BG_IC_STATE_HORDE_REINFORCE_COUNT, reinforcements);
 }
 
 void BattleGroundIC::HandleGameObjectDamaged(Player* player, GameObject* object, uint32 spellId)
@@ -592,6 +623,43 @@ void BattleGroundIC::HandleGameObjectCreate(GameObject* go)
         case BG_IC_GO_GUNSHIP_PORTAL_EFFECTS_H:
             m_hangarAnimGuids[TEAM_INDEX_HORDE].insert(go->GetDbGuid());
             break;
+        case BG_IC_GO_BANNER_ALLIANCE_KEEP_A:
+        case BG_IC_GO_BANNER_ALLIANCE_KEEP_A_GREY:
+        case BG_IC_GO_BANNER_ALLIANCE_KEEP_H:
+        case BG_IC_GO_BANNER_ALLIANCE_KEEP_H_GREY:
+        case BG_IC_GO_BANNER_HORDE_KEEP_A:
+        case BG_IC_GO_BANNER_HORDE_KEEP_A_GREY:
+        case BG_IC_GO_BANNER_HORDE_KEEP_H:
+        case BG_IC_GO_BANNER_HORDE_KEEP_H_GREY:
+        case BG_IC_GO_BANNER_WORKSHOP_A:
+        case BG_IC_GO_BANNER_WORKSHOP_A_GREY:
+        case BG_IC_GO_BANNER_WORKSHOP_H:
+        case BG_IC_GO_BANNER_WORKSHOP_H_GREY:
+        case BG_IC_GO_BANNER_DOCKS_A:
+        case BG_IC_GO_BANNER_DOCKS_A_GREY:
+        case BG_IC_GO_BANNER_DOCKS_H:
+        case BG_IC_GO_BANNER_DOCKS_H_GREY:
+        case BG_IC_GO_BANNER_HANGAR_A:
+        case BG_IC_GO_BANNER_HANGAR_A_GREY:
+        case BG_IC_GO_BANNER_HANGAR_H:
+        case BG_IC_GO_BANNER_HANGAR_H_GREY:
+        case BG_IC_GO_BANNER_REFINERY_A:
+        case BG_IC_GO_BANNER_REFINERY_A_GREY:
+        case BG_IC_GO_BANNER_REFINERY_H:
+        case BG_IC_GO_BANNER_REFINERY_H_GREY:
+        case BG_IC_GO_BANNER_QUARRY_A:
+        case BG_IC_GO_BANNER_QUARRY_A_GREY:
+        case BG_IC_GO_BANNER_QUARRY_H:
+        case BG_IC_GO_BANNER_QUARRY_H_GREY:
+        case BG_IC_GO_BANNER_DOCKS:
+        case BG_IC_GO_BANNER_HANGAR:
+        case BG_IC_GO_BANNER_QUARRY:
+        case BG_IC_GO_BANNER_WORKSHOP:
+        case BG_IC_GO_BANNER_REFINERY:
+        case BG_IC_GO_GUNSHIP_A:
+        case BG_IC_GO_GUNSHIP_H:
+            m_goEntryGuidStore[go->GetEntry()] = go->GetObjectGuid();
+            break;
     }
 }
 
@@ -658,9 +726,9 @@ void BattleGroundIC::DoCaptureObjective(IsleObjective nodeId)
             m_isleNode[nodeId].nodeConquerer = ownerIdx;
 
             // update world states
-            UpdateWorldState(m_isleNode[nodeId].nodeWorldState, WORLD_STATE_REMOVE);
+            GetBgMap()->GetVariableManager().SetVariable(m_isleNode[nodeId].nodeWorldState, WORLD_STATE_REMOVE);
             m_isleNode[nodeId].nodeWorldState = i.nextState;
-            UpdateWorldState(m_isleNode[nodeId].nodeWorldState, WORLD_STATE_ADD);
+            GetBgMap()->GetVariableManager().SetVariable(m_isleNode[nodeId].nodeWorldState, WORLD_STATE_ADD);
 
             ChatMsg chatSystem = ownerIdx == TEAM_INDEX_ALLIANCE ? CHAT_MSG_BG_SYSTEM_ALLIANCE : CHAT_MSG_BG_SYSTEM_HORDE;
             uint32 factionStrig = ownerIdx == TEAM_INDEX_ALLIANCE ? LANG_BG_ALLY : LANG_BG_HORDE;
