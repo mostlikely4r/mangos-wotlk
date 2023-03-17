@@ -493,17 +493,10 @@ bool Map::Add(Player* player)
     SendInitTransports(player);
 
     NGridType* grid = getNGrid(cell.GridX(), cell.GridY());
-#ifdef ENABLE_PLAYERBOTS
-    if (player->isRealPlayer())
-    {
-#endif
-        player->GetViewPoint().Event_AddedToWorld(&(*grid)(cell.CellX(), cell.CellY()));
-        UpdateObjectVisibility(player, cell, p);
-#ifdef ENABLE_PLAYERBOTS
-    }
-#endif
+    player->GetViewPoint().Event_AddedToWorld(&(*grid)(cell.CellX(), cell.CellY()));
+    UpdateObjectVisibility(player, cell, p);
 
-//Start Solocraft Functions
+    //Start Solocraft Functions
     if (sWorld.getConfig(CONFIG_BOOL_SOLOCRAFT_ENABLED))
     {
         //Get Config Values
@@ -737,7 +730,7 @@ bool Map::Add(Player* player)
         int numInGroup = GetNumInGroup(player);
         ApplyBuffs(player, map, difficulty, dunLevel, numInGroup);
     }
-//End Solocraft Functions
+    //End Solocraft Functions
 
     if (IsRaid())
         player->RemoveAllGroupBuffsFromCaster(ObjectGuid());
@@ -1658,7 +1651,10 @@ void Map::UpdateObjectVisibility(WorldObject* obj, Cell cell, const CellPair& ce
     cell.Visit(cellpair, player_notifier, *this, *obj, obj->GetVisibilityData().GetVisibilityDistance());
     for (auto guid : notifier.GetUnvisitedGuids())
         if (Player* player = GetPlayer(guid))
-            player->UpdateVisibilityOf(player->GetCamera().GetBody(), obj);
+#ifdef ENABLE_PLAYERBOTS
+            if (player->isRealPlayer())
+#endif
+                player->UpdateVisibilityOf(player->GetCamera().GetBody(), obj);
 }
 
 void Map::SendInitSelf(Player* player) const
