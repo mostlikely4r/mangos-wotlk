@@ -9599,7 +9599,7 @@ void Aura::HandleTriggerLinkedAura(bool apply, bool Real)
     Unit* target = GetTarget();
     Unit* caster = GetCaster();
 
-    if (apply)
+    if (apply && caster)
     {
         SpellCastArgs args;
         int32 points = GetAmount();
